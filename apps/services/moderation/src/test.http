@@ -1,0 +1,113 @@
+@postUrl = http://localhost:3002
+@identityUrl = http://localhost:3001
+@moderationUrl = http://localhost:3003
+
+### ───────────────────────────────
+### HEALTH CHECKS
+### all three services must be running
+### ───────────────────────────────
+
+### 1. Identity health
+GET {{identityUrl}}/health
+
+###
+
+### 2. Post health
+GET {{postUrl}}/health
+
+###
+
+### 3. Moderation health
+GET {{moderationUrl}}/health
+
+
+### ───────────────────────────────
+### SETUP — get token from identity
+### ───────────────────────────────
+
+### 4. Login
+POST {{identityUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123"
+}
+
+### ───────────────────────────────
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOWJjMzA1Yi1mNDM0LTRlZjUtYmQ5Ny1iMWU2MTNiNWEwYjMiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOiJhMWIyYzNkNC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJ2ZXJpZmljYXRpb25MZXZlbCI6InBvc3RjYXJkX3ZlcmlmaWVkIiwiaWF0IjoxNzc5MTA5NTI5LCJleHAiOjE3NzkxMTA0Mjl9.fjwPEbL3UPLbGXx8IL43vDLo055KoQHAtIiF4kYsWfI
+@postId = 0150b951-056d-4730-ab46-f3e3a10183c3
+### ───────────────────────────────
+
+
+### ───────────────────────────────
+### FULL PIPELINE TEST
+### ───────────────────────────────
+
+### 5. Create post — watch moderation console after this
+POST {{postUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "community",
+  "title": "Stray dog near park gate",
+  "body": "There is a friendly stray near the main gate, someone please adopt"
+}
+
+###
+
+### 6. Get post immediately — should return 404 (still pending)
+GET {{postUrl}}/posts/{{postId}}
+
+###
+
+### 7. Wait 2-3 seconds for moderation, then get again
+### if moderation approved it → post now visible
+GET {{postUrl}}/posts/{{postId}}
+
+
+### ───────────────────────────────
+### TEST FLAGGING BEHAVIOR
+### ───────────────────────────────
+
+### 8. Create post with spam text — should get flagged by worker
+POST {{postUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "classified",
+  "title": "Click here to earn free money guaranteed income",
+  "body": "Whatsapp me for deal, work from home earn 50000 daily"
+}
+
+###
+
+### 9. Check moderation queue — flagged post should appear here
+GET {{moderationUrl}}/moderation/queue
+
+
+### ───────────────────────────────
+### HUMAN REVIEW
+### ───────────────────────────────
+
+### 10. Human approves a flagged post
+POST {{moderationUrl}}/moderation/{{postId}}/decision
+Content-Type: application/json
+
+{
+  "decision": "approved",
+  "reason": "False positive — legitimate listing"
+}
+
+###
+
+### 11. Human removes a post
+POST {{moderationUrl}}/moderation/{{postId}}/decision
+Content-Type: application/json
+
+{
+  "decision": "removed",
+  "reason": "Confirmed spam"
+}

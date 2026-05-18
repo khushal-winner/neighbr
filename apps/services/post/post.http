@@ -1,0 +1,218 @@
+@baseUrl = http://localhost:3002
+@identityUrl = http://localhost:3001
+
+### ───────────────────────────────
+### HEALTH
+### ───────────────────────────────
+
+### 1. Health check
+GET {{baseUrl}}/health
+
+
+### ───────────────────────────────
+### SETUP
+### pehle identity service se login karo
+### token copy karo neeche
+### ───────────────────────────────
+
+### 2. Login
+POST {{identityUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123"
+}
+
+### ───────────────────────────────
+### token yahan paste karo
+### ───────────────────────────────
+
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOWJjMzA1Yi1mNDM0LTRlZjUtYmQ5Ny1iMWU2MTNiNWEwYjMiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOiJhMWIyYzNkNC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJ2ZXJpZmljYXRpb25MZXZlbCI6InBvc3RjYXJkX3ZlcmlmaWVkIiwiaWF0IjoxNzc5MDM3MzQxLCJleHAiOjE3NzkwMzgyNDF9.VJi5IoB9TLbKrCXJGUBvbl4AuToAyyOwFYFztt6l8_E
+@postId = f3721195-6ba3-4ed1-8af7-e9fff22a1c08
+
+
+### ───────────────────────────────
+### CREATE POSTS
+### ───────────────────────────────
+
+### 3. Create community post — valid
+POST {{baseUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "community",
+  "title": "Mera parcel kisi ne uthaya",
+  "body": "Aaj subah mera Amazon parcel missing hai block B ke paas se"
+}
+
+###
+
+### 4. Create emergency post
+POST {{baseUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "emergency",
+  "title": "Gas leak aa rahi hai",
+  "body": "Building B ke paas strong smell aa rahi hai, sablog door raho"
+}
+
+###
+
+### 5. Create classified post
+POST {{baseUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "classified",
+  "title": "Sofa bechna hai",
+  "body": "3 seater sofa, good condition, 2 saal purana. 5000 mein"
+}
+
+###
+
+### 6. No token — should return 401
+POST {{baseUrl}}/posts
+Content-Type: application/json
+
+{
+  "type": "community",
+  "title": "Test",
+  "body": "Test body"
+}
+
+###
+
+### 7. Invalid post type — should return 400
+POST {{baseUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "random_type",
+  "title": "Test",
+  "body": "Test body"
+}
+
+###
+
+### 8. Missing title — should return 400
+POST {{baseUrl}}/posts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "community",
+  "body": "No title provided"
+}
+
+
+### ───────────────────────────────
+### GET POST
+### ───────────────────────────────
+
+### 9. Get post — pending (should return 404, not approved yet)
+GET {{baseUrl}}/posts/{{postId}}
+
+###
+
+### 10. Approve post first via status endpoint, then get
+PATCH {{baseUrl}}/posts/{{postId}}/status
+Content-Type: application/json
+
+{
+  "status": "approved"
+}
+
+###
+
+### 11. Get post — now approved (should return post)
+GET {{baseUrl}}/posts/{{postId}}
+
+###
+
+### 12. Get post — fake id (should return 404)
+GET {{baseUrl}}/posts/00000000-0000-0000-0000-000000000000
+
+
+### ───────────────────────────────
+### INTERACTIONS
+### ───────────────────────────────
+
+### 13. Upvote approved post
+POST {{baseUrl}}/posts/{{postId}}/upvote
+Authorization: Bearer {{token}}
+
+###
+
+### 14. Upvote pending post — should return 400
+POST {{baseUrl}}/posts/{{postId}}/upvote
+Authorization: Bearer {{token}}
+
+###
+
+### 15. Flag post
+POST {{baseUrl}}/posts/{{postId}}/flag
+Authorization: Bearer {{token}}
+
+###
+
+### 16. Flag — no token (should return 401)
+POST {{baseUrl}}/posts/{{postId}}/flag
+
+
+### ───────────────────────────────
+### STATUS UPDATE (internal)
+### ───────────────────────────────
+
+### 17. Mark flagged
+PATCH {{baseUrl}}/posts/{{postId}}/status
+Content-Type: application/json
+
+{
+  "status": "flagged"
+}
+
+###
+
+### 18. Mark removed
+PATCH {{baseUrl}}/posts/{{postId}}/status
+Content-Type: application/json
+
+{
+  "status": "removed"
+}
+
+###
+
+### 19. Invalid status — should return 400
+PATCH {{baseUrl}}/posts/{{postId}}/status
+Content-Type: application/json
+
+{
+  "status": "banana"
+}
+
+
+### ───────────────────────────────
+### DELETE
+### ───────────────────────────────
+
+### 20. Delete post — author
+DELETE {{baseUrl}}/posts/{{postId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 21. Delete — no token (should return 401)
+DELETE {{baseUrl}}/posts/{{postId}}
+
+###
+
+### 22. Delete — already deleted (should return 404)
+DELETE {{baseUrl}}/posts/{{postId}}
+Authorization: Bearer {{token}}

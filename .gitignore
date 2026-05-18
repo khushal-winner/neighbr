@@ -1,38 +1,34 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # Dependencies
-node_modules
+node_modules/
 .pnp
 .pnp.js
 
-# Local env files
+# Build outputs
+dist/
+build/
+.turbo/
+
+# Environment files — NEVER commit these
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.production
+*.env
 
-# Testing
-coverage
+# Prisma generated client
+**/generated/
+**/.prisma/
 
-# Turbo
-.turbo
-
-# Vercel
-.vercel
-
-# Build Outputs
-.next/
-out/
-build
-dist
-
-
-# Debug
+# Logs
+*.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Misc
+# OS
 .DS_Store
-*.pem
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Test coverage
+coverage/

@@ -1,0 +1,102 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model City {
+  id          String           @id @default(uuid())
+  name        String
+  country     String
+  createdAt   DateTime         @default(now())
+  communities MicroCommunity[]
+}
+
+model MicroCommunity {
+  id             String                   @id @default(uuid())
+  name           String
+  cityId         String
+  blockCaptainId String?
+  residentCount  Int                      @default(0)
+  lastDigestAt   DateTime?
+  createdAt      DateTime                 @default(now())
+  boundary       Unsupported("geometry")?
+  city           City                     @relation(fields: [cityId], references: [id])
+  posts          Post[]
+  users          User[]
+}
+
+enum VerificationLevel {
+  unverified
+  email_verified
+  postcard_verified
+}
+
+model User {
+  id                String            @id @default(uuid())
+  email             String            @unique
+  passwordHash      String
+  displayName       String
+  verificationLevel VerificationLevel @default(unverified)
+  trustScore        Int               @default(0)
+  communityId       String?
+  notificationPrefs Json              @default("{}")
+  createdAt         DateTime          @default(now())
+  posts             Post[]
+  community         MicroCommunity?   @relation(fields: [communityId], references: [id])
+}
+
+model Post {
+  id               String         @id @default(uuid())
+  authorId         String
+  communityId      String
+  type             String
+  title            String
+  body             String
+  imageUrls        String[]       @default([])
+  moderationStatus String         @default("pending")
+  upvotes          Int            @default(0)
+  flagCount        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  author           User           @relation(fields: [authorId], references: [id])
+  community        MicroCommunity @relation(fields: [communityId], references: [id])
+}
+
+model ModerationDecision {
+  id        String   @id @default(uuid())
+  postId    String
+  decision  String
+  score     Float
+  decidedAt DateTime @default(now())
+}
+
+model TrustScoreEvent {
+  id         String   @id @default(uuid())
+  userId     String
+  eventType  String
+  delta      Int
+  occurredAt DateTime @default(now())
+}
+
+model ChatMessage {
+  id          String    @id @default(uuid())
+  threadId    String
+  senderId    String
+  recipientId String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}

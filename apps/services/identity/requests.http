@@ -1,0 +1,274 @@
+@baseUrl = http://localhost:3001
+@email = testuser@example.com
+@password = password123
+
+### ───────────────────────────────
+### HEALTH
+### ───────────────────────────────
+
+### 1. Health check
+GET {{baseUrl}}/health
+
+
+### ───────────────────────────────
+### AUTH
+### ───────────────────────────────
+
+### 2. Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "displayName": "Test User"
+}
+
+###
+
+### 3. Register — duplicate email (should return 409)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "displayName": "Test User"
+}
+
+###
+
+### 4. Register — weak password (should return 400)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "weak@example.com",
+  "password": "123",
+  "displayName": "Weak"
+}
+
+###
+
+### 5. Login — valid credentials
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+###
+
+### 6. Login — wrong password (should return 401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "wrongpassword"
+}
+
+###
+
+### 7. Login — email doesn't exist (should return 401, NOT 404)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ghost@example.com",
+  "password": "password123"
+}
+
+
+### ───────────────────────────────
+### PROTECTED ROUTES
+### paste your accessToken from login response below
+### ───────────────────────────────
+
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOWJjMzA1Yi1mNDM0LTRlZjUtYmQ5Ny1iMWU2MTNiNWEwYjMiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOiJhMWIyYzNkNC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJ2ZXJpZmljYXRpb25MZXZlbCI6InBvc3RjYXJkX3ZlcmlmaWVkIiwiaWF0IjoxNzc4OTQ1Nzg1LCJleHAiOjE3Nzg5NDY2ODV9.K-f1JXdVhVXA6I8R3rocwqmFtOsupCQpfP3YAqDXFHc
+
+### 8. Get current user — valid token
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+###
+
+### 9. Get current user — no token (should return 401)
+GET {{baseUrl}}/auth/me
+
+###
+
+### 10. Get current user — fake token (should return 401)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer thisisafaketoken
+
+
+### ───────────────────────────────
+### REFRESH + LOGOUT
+### ───────────────────────────────
+
+### 11. Refresh token
+### (refresh_token cookie is set automatically by REST Client from login response)
+POST {{baseUrl}}/auth/refresh
+
+###
+
+### 12. Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{token}}
+
+###
+
+### 13. Refresh after logout (should return 401)
+POST {{baseUrl}}/auth/refresh
+
+
+### ───────────────────────────────
+### VERIFICATION
+### ───────────────────────────────
+
+### 14. Submit address — valid
+POST {{baseUrl}}/verification/submit-address
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "address": "Connaught Place, New Delhi, India"
+}
+
+###
+
+### 15. Submit address — no token (should return 401)
+POST {{baseUrl}}/verification/submit-address
+Content-Type: application/json
+
+{
+  "address": "Connaught Place, New Delhi, India"
+}
+
+###
+
+### 16. Submit address — bad address (should return 400)
+POST {{baseUrl}}/verification/submit-address
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "address": "xyzzy fake street 999999"
+}
+
+###
+
+### 17. Request postcard
+POST {{baseUrl}}/verification/request-postcard
+Authorization: Bearer {{token}}
+
+###
+
+### 18. Request postcard again — already verified check
+### (run this after confirming postcard, should return 400)
+POST {{baseUrl}}/verification/request-postcard
+Authorization: Bearer {{token}}
+
+
+### ───────────────────────────────
+### CONFIRM POSTCARD
+### paste the 6-digit code from request-postcard response below
+### ───────────────────────────────
+
+@postcardCode = 395896
+
+### 19. Confirm postcard — valid code
+POST {{baseUrl}}/verification/confirm-postcard
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "{{postcardCode}}"
+}
+
+###
+
+### 20. Confirm postcard — same code again (should return 400, key deleted)
+POST {{baseUrl}}/verification/confirm-postcard
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "{{postcardCode}}"
+}
+
+###
+
+### 21. Confirm postcard — wrong code (should return 400)
+POST {{baseUrl}}/verification/confirm-postcard
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "000000"
+}
+
+
+### ───────────────────────────────
+### USER PROFILE
+### paste a real userId from register response below
+### ───────────────────────────────
+
+@userId = a9bc305b-f434-4ef5-bd97-b1e613b5a0b3
+
+### 22. Get public profile — valid user
+GET {{baseUrl}}/users/{{userId}}/profile
+
+###
+
+### 23. Get public profile — fake ID (should return 404)
+GET {{baseUrl}}/users/00000000-0000-0000-0000-000000000000/profile
+
+
+### ───────────────────────────────
+### UPDATE PROFILE
+### ───────────────────────────────
+
+### 24. Update display name
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "Updated Name"
+}
+
+###
+
+### 25. Update notification prefs
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "notificationPrefs": {
+    "pushAlerts": false
+  }
+}
+
+###
+
+### 26. Empty body (should return 400)
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+###
+
+### 27. No token (should return 401)
+PATCH {{baseUrl}}/users/me
+Content-Type: application/json
+
+{
+  "displayName": "Hacker"
+}
