@@ -100,4 +100,30 @@ export async function userRoutes(app: FastifyInstance) {
         }
 
     })
+
+    // POST /users/me/fcm-toke
+    // called by frontend after firebase gives it a device token
+    // one user can have multiple token - one per device
+    app.post('users/me/fcm-token', { preHandler: requireAuth }, async (request, reply) => {
+        const Schema = z.object({
+            token: z.string().min(1),
+        })
+
+        const body = Schema.safeParse(request.body)
+        if (!body.success) {
+            return reply.status(400).send({ error: 'Invalid Token' })
+        }
+
+        const user = request.user as { sub: string }
+
+        // upsert - if token already registered for this ser, update timestamp
+
+        await prisma.fcmToken.upsert({
+            where: { token: body.data.token },
+            create: { userId: user.sub, token: body.data.token },
+            update: { userId: user.sub },
+        })
+
+        return reply.send({ message: 'Token registered' })
+    })
 }

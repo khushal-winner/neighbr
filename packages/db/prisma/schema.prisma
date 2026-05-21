@@ -28,26 +28,59 @@ model MicroCommunity {
   city           City                     @relation(fields: [cityId], references: [id])
   posts          Post[]
   users          User[]
+  polls          Poll[]
+  pinnedPostId   String? // block captain sets this
 }
 
-enum VerificationLevel {
-  unverified
-  email_verified
-  postcard_verified
+model Poll {
+  id          String         @id @default(uuid())
+  communityId String
+  community   MicroCommunity @relation(fields: [communityId], references: [id])
+  createdById String
+  question    String
+  closesAt    DateTime? //null = open indefinitely
+  createdAt   DateTime       @default(now())
+  options     PollOption[]
+  votes       PollVote[]
+}
+
+model PollOption {
+  id     String     @id @default(uuid())
+  pollId String
+  poll   Poll       @relation(fields: [pollId], references: [id])
+  text   String
+  votes  PollVote[]
+}
+
+model PollVote {
+  id        String     @id @default(uuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id])
+  optionId  String
+  option    PollOption @relation(fields: [optionId], references: [id])
+  userId    String
+  createdAt DateTime   @default(now())
+
+  @@unique([pollId, userId]) // one vote per user per poll
 }
 
 model User {
-  id                String            @id @default(uuid())
-  email             String            @unique
+  id                String                   @id @default(uuid())
+  email             String                   @unique
   passwordHash      String
   displayName       String
-  verificationLevel VerificationLevel @default(unverified)
-  trustScore        Int               @default(0)
+  verificationLevel String                   @default("unverified")
+  trustScore        Int                      @default(0)
   communityId       String?
-  notificationPrefs Json              @default("{}")
-  createdAt         DateTime          @default(now())
+  notificationPrefs Json                     @default("{}")
+  createdAt         DateTime                 @default(now())
+  homeLocation      Unsupported("geometry")?
+  publicLocation    Unsupported("geometry")?
   posts             Post[]
-  community         MicroCommunity?   @relation(fields: [communityId], references: [id])
+  fcmTokens         FcmToken[]
+  community         MicroCommunity?          @relation(fields: [communityId], references: [id])
+
+  @@index([homeLocation], map: "idx_user_home_location", type: Gist)
 }
 
 model Post {
@@ -82,14 +115,33 @@ model TrustScoreEvent {
   occurredAt DateTime @default(now())
 }
 
+model ChatThread {
+  id           String            @id @default(uuid())
+  type         String            @default("dm") // "dm" or "group"
+  communityId  String? // only set for group threads
+  createdAt    DateTime          @default(now())
+  messages     ChatMessage[]
+  participants ChatParticipant[]
+}
+
+model ChatParticipant {
+  id       String     @id @default(uuid())
+  threadId String
+  thread   ChatThread @relation(fields: [threadId], references: [id])
+  userId   String
+  joinedAt DateTime   @default(now())
+
+  @@unique([threadId, userId]) // one row per user per thread
+}
+
 model ChatMessage {
-  id          String    @id @default(uuid())
-  threadId    String
-  senderId    String
-  recipientId String
-  body        String
-  readAt      DateTime?
-  createdAt   DateTime  @default(now())
+  id        String     @id @default(uuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id])
+  senderId  String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -99,4 +151,19 @@ model spatial_ref_sys {
   auth_srid Int?
   srtext    String? @db.VarChar(2048)
   proj4text String? @db.VarChar(2048)
+}
+
+enum VerificationLevel {
+  unverified
+  email_verified
+  postcard_verified
+}
+
+model FcmToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

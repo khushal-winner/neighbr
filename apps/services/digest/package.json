@@ -1,0 +1,24 @@
+{
+  "name": "@neighbr/digest",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "trigger": "ts-node src/scripts/trigger-now.ts",
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.8.0",
+    "bullmq": "^5.76.10",
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.10.1",
+    "resend": "^6.12.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "prisma": "^7.8.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}

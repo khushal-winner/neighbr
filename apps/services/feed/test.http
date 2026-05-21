@@ -1,0 +1,55 @@
+@feedUrl = http://localhost:3004
+@identityUrl = http://localhost:3001
+@postUrl = http://localhost:3002
+
+### 1. Health
+GET {{feedUrl}}/health
+
+###
+
+### 2. Login to get token
+POST {{identityUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123"
+}
+
+###
+
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOWJjMzA1Yi1mNDM0LTRlZjUtYmQ5Ny1iMWU2MTNiNWEwYjMiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOiJhMWIyYzNkNC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJ2ZXJpZmljYXRpb25MZXZlbCI6InBvc3RjYXJkX3ZlcmlmaWVkIiwiaWF0IjoxNzc5MjA1MzI2LCJleHAiOjE3NzkyMDYyMjZ9.FmorghSYxTr1FNnIIJW8ko50w79wG-AtfhXMSL5ei8I
+@postId = 103a7d5d-f448-42f5-9506-3e984e0a8ad3
+
+### 3. Get feed — should return approved posts for your community
+GET {{feedUrl}}/feed
+Authorization: Bearer {{token}}
+
+###
+
+### 4. Get feed — with limit
+GET {{feedUrl}}/feed?limit=5
+Authorization: Bearer {{token}}
+
+###
+
+### 5. Get feed — cursor pagination (paste nextCursor from response above)
+@cursor = 1779037433306
+GET {{feedUrl}}/feed?cursor={{cursor}}&limit=5
+Authorization: Bearer {{token}}
+
+###
+
+### 6. Get single post by ID
+GET {{feedUrl}}/feed/post/{{postId}}
+
+###
+
+### 7. Get feed — no token (should return 401)
+GET {{feedUrl}}/feed
+
+###
+
+### 8. Get feed — user not in any community
+### (create a new user without address verification, login, try feed)
+### should return 400 "You must verify your address"

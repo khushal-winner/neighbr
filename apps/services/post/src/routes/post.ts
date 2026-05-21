@@ -5,6 +5,7 @@ import prisma from '../plugins/prisma'
 import { request } from 'node:http'
 import { error } from 'node:console'
 import { PublishToModerationQueue } from '../services/queue'
+import { getKafkaProducer } from '../plugins/kafka'
 
 
 const PostTypeSchema = z.enum([
@@ -87,12 +88,30 @@ export async function postRoutes(app: FastifyInstance) {
 
         }).catch(error => console.error('[Post} Moderation queue published failed:', error))
 
-        // emergency bypass - don't wait forb moderation
-        // alert fan-out servicer will pick this from kafka
-
         if (type == 'emergency') {
-            console.log('[Post] Emergency post ${post.id} — Kafka publish pending Phase 6')
+            // emergency bypass — skip moderation queue, publish directly to Kafka
+            // Alert Fan-Out consumer will pick this up and deliver within 5 seconds
+            const producer = await getKafkaProducer()
+            await producer.send({
+                topic: `alerts:${post.communityId}`,
+                messages: [{
+                    key: post.id,
+                    value: JSON.stringify({
+                        postId: post.id,
+                        communityId: post.communityId,
+                        cityId: post.communityId,   // you may need to include cityId in the DB query
+                        title: post.title,
+                        body: post.body,
+                        // coordinates come from the author's stored location
+                        // for MVP we look them up; in production this would be in the JWT
+                        authorId: post.authorId,
+                        createdAt: post.createdAt.toISOString(),
+                    })
+                }]
+
+            })
         }
+
         return reply.status(201).send({ post })
     })
 
@@ -134,7 +153,7 @@ export async function postRoutes(app: FastifyInstance) {
 
         const post = await prisma.post.findUnique({
             where: { id },
-            select: { id: true }
+            select: { id: true, authorId: true }
         })
 
         if (!post) {
@@ -147,8 +166,19 @@ export async function postRoutes(app: FastifyInstance) {
             select: { id: true, flagCount: true }
         })
 
-        // TODO Phase 9 — publish flag event to Kafka user.events
         // trust score service will deduct points from author
+        const producer = await getKafkaProducer()
+        await producer.send({
+            topic: 'user.events',
+            messages: [{
+                key: post.authorId,
+                value: JSON.stringify({
+                    userId: post.authorId,
+                    eventType: 'flag-received',
+                    occuredAt: new Date().toISOString(),
+                })
+            }]
+        })
 
         return reply.send({ flagCount: updated.flagCount })
     })
@@ -159,7 +189,7 @@ export async function postRoutes(app: FastifyInstance) {
 
         const post = await prisma.post.findUnique({
             where: { id },
-            select: { id: true, moderationStatus: true }
+            select: { id: true, moderationStatus: true, authorId: true }
         })
 
         if (!post) {
@@ -176,9 +206,20 @@ export async function postRoutes(app: FastifyInstance) {
             select: { id: true, upvotes: true }
         })
 
-        // TODO Phase 9 — publish upvote event to Kafka user.events
         // trust score service will add points to author
-
+        const producer = await getKafkaProducer()
+        await producer.send({
+            topic: 'user.events',
+            messages: [{
+                key: post.authorId,
+                value: JSON.stringify({
+                    userId: post.authorId,
+                    eventType: 'post-upvoted',
+                    postId: id,
+                    occuredAt: new Date().toISOString()
+                })
+            }]
+        })
 
         return reply.send({ upvotes: updated.upvotes })
     })

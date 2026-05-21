@@ -1,0 +1,181 @@
+@chatUrl = http://localhost:3005
+@identityUrl = http://localhost:3001
+
+### 1. Health
+GET {{chatUrl}}/health
+
+
+### ─────────────────────────────
+### SETUP
+### ─────────────────────────────
+
+### 2. Login user A
+POST {{identityUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123"
+}
+
+###
+
+@tokenA = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5NGM1ZjU2ZC1kMGY5LTRiMjktOTBlZC1iMTI2NjExY2ZjNzQiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOm51bGwsInZlcmlmaWNhdGlvbkxldmVsIjoidW52ZXJpZmllZCIsImlhdCI6MTc3OTI4OTA3NSwiZXhwIjoxNzc5Mjg5OTc1fQ.2O1d1SAry7o5AwdZ7OkW6wSjunWFJzobc1Kqo9JWzC0
+@userAId = 94c5f56d-d0f9-4b29-90ed-b126611cfc74
+
+### 3. Register + login user B (second test account)
+POST {{identityUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "testuser2@example.com",
+  "password": "password123",
+  "displayName": "Test User B"
+}
+
+###
+
+### 4. Login user B
+POST {{identityUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser2@example.com",
+  "password": "password123"
+}
+
+###
+
+@tokenB = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NzYxOTdiMC1iYmFkLTQyZjUtOGJkNC0zZTA5ZWY3NGE0YzAiLCJlbWFpbCI6InRlc3R1c2VyMkBleGFtcGxlLmNvbSIsImNvbW11bml0eUlkIjpudWxsLCJ2ZXJpZmljYXRpb25MZXZlbCI6InVudmVyaWZpZWQiLCJpYXQiOjE3NzkyODkxMTksImV4cCI6MTc3OTI5MDAxOX0.9ARFlhMaueuJeaI7m8fixeJBx1lQe9Et5Kj2reeRFwI
+@userBId = 676197b0-bbad-42f5-8bd4-3e09ef74a4c0
+
+
+### ─────────────────────────────
+### DM THREADS
+### ─────────────────────────────
+
+### 5. Start DM thread (A → B)
+POST {{chatUrl}}/chat/dm
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{
+  "recipientId": "{{userBId}}"
+}
+
+###
+
+@threadId = PASTE_THREAD_ID_HERE
+
+### 6. Start same DM again — should return same thread (idempotent)
+POST {{chatUrl}}/chat/dm
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{
+  "recipientId": "{{userBId}}"
+}
+
+###
+
+### 7. Try DM with yourself (should return 400)
+POST {{chatUrl}}/chat/dm
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{
+  "recipientId": "{{userAId}}"
+}
+
+###
+
+### 8. Send message from A
+POST {{chatUrl}}/chat/dm/{{threadId}}/message
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{
+  "body": "Hey neighbour, is the stray dog still near the park?"
+}
+
+###
+
+### 9. Send reply from B
+POST {{chatUrl}}/chat/dm/{{threadId}}/message
+Authorization: Bearer {{tokenB}}
+Content-Type: application/json
+
+{
+  "body": "Yes still there! Very friendly though."
+}
+
+###
+
+### 10. Get message history
+GET {{chatUrl}}/chat/dm/{{threadId}}/messages
+Authorization: Bearer {{tokenA}}
+
+###
+
+### 11. Cursor pagination — paste nextCursor from response above
+@cursor = PASTE_CURSOR_HERE
+GET {{chatUrl}}/chat/dm/{{threadId}}/messages?cursor={{cursor}}&limit=10
+Authorization: Bearer {{tokenA}}
+
+###
+
+### 12. Mark thread as read
+PATCH {{chatUrl}}/chat/dm/{{threadId}}/read
+Authorization: Bearer {{tokenA}}
+
+###
+
+### 13. List all DM threads
+GET {{chatUrl}}/chat/threads
+Authorization: Bearer {{tokenA}}
+
+###
+
+### 14. Try accessing thread you're not part of (should return 403)
+### create a third user first, get their token, then try accessing this thread
+POST {{chatUrl}}/chat/dm/{{threadId}}/message
+Authorization: Bearer {{tokenB}}
+Content-Type: application/json
+
+{
+  "body": "I should not be able to post here if I am not a participant"
+}
+
+
+### ─────────────────────────────
+### GROUP CHAT
+### ─────────────────────────────
+
+@communityId = a1b2c3d4-0000-0000-0000-000000000002
+
+### 15. Get or create group thread
+GET {{chatUrl}}/chat/group/{{communityId}}
+Authorization: Bearer {{tokenA}}
+
+###
+
+### 16. Send group message
+POST {{chatUrl}}/chat/group/{{communityId}}/message
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{
+  "body": "Block cleanup this Saturday 10am, everyone welcome!"
+}
+
+###
+
+### 17. Get group message history
+GET {{chatUrl}}/chat/group/{{communityId}}/messages
+Authorization: Bearer {{tokenA}}
+
+###
+
+### 18. Try accessing another community's group (should return 403)
+GET {{chatUrl}}/chat/group/00000000-0000-0000-0000-000000000999
+Authorization: Bearer {{tokenA}}

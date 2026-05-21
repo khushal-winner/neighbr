@@ -1,3 +1,6 @@
+-- CreateEnum
+CREATE TYPE "VerificationLevel" AS ENUM ('unverified', 'email_verified', 'postcard_verified');
+
 -- CreateTable
 CREATE TABLE "City" (
     "id" TEXT NOT NULL,
@@ -17,6 +20,7 @@ CREATE TABLE "MicroCommunity" (
     "residentCount" INTEGER NOT NULL DEFAULT 0,
     "lastDigestAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "boundary" geometry,
 
     CONSTRAINT "MicroCommunity_pkey" PRIMARY KEY ("id")
 );
@@ -32,6 +36,8 @@ CREATE TABLE "User" (
     "communityId" TEXT,
     "notificationPrefs" JSONB NOT NULL DEFAULT '{}',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "homeLocation" geometry,
+    "publicLocation" geometry,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -76,11 +82,30 @@ CREATE TABLE "TrustScoreEvent" (
 );
 
 -- CreateTable
+CREATE TABLE "ChatThread" (
+    "id" TEXT NOT NULL,
+    "type" TEXT NOT NULL DEFAULT 'dm',
+    "communityId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ChatThread_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ChatParticipant" (
+    "id" TEXT NOT NULL,
+    "threadId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ChatParticipant_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "ChatMessage" (
     "id" TEXT NOT NULL,
     "threadId" TEXT NOT NULL,
     "senderId" TEXT NOT NULL,
-    "recipientId" TEXT NOT NULL,
     "body" TEXT NOT NULL,
     "readAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,6 +115,12 @@ CREATE TABLE "ChatMessage" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE INDEX "idx_user_home_location" ON "User" USING GIST ("homeLocation");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ChatParticipant_threadId_userId_key" ON "ChatParticipant"("threadId", "userId");
 
 -- AddForeignKey
 ALTER TABLE "MicroCommunity" ADD CONSTRAINT "MicroCommunity_cityId_fkey" FOREIGN KEY ("cityId") REFERENCES "City"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -102,3 +133,9 @@ ALTER TABLE "Post" ADD CONSTRAINT "Post_authorId_fkey" FOREIGN KEY ("authorId") 
 
 -- AddForeignKey
 ALTER TABLE "Post" ADD CONSTRAINT "Post_communityId_fkey" FOREIGN KEY ("communityId") REFERENCES "MicroCommunity"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ChatParticipant" ADD CONSTRAINT "ChatParticipant_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "ChatThread"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "ChatThread"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

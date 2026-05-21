@@ -4,6 +4,7 @@ import prisma from '../plugins/prisma'
 import { requireAuth } from '../plugins/auth'
 import { getRedis } from '../plugins/redis'
 import { VerificationLevel } from '@neighbr/db';
+import { getKafkaProducer } from '../plugins/kafka'
 
 
 const AddressSchema = z.object({
@@ -62,12 +63,22 @@ export async function verificationRoutes(app: FastifyInstance) {
         const communityId = communities[0].id
 
         // Step 3 - update user record
-        const updated = await prisma.user.update({
+        // store geocoded coordinates — used by Alert Fan-Out for radius queries
+        const updated = await prisma.$executeRaw`
+  UPDATE "User"
+  SET
+    "communityId" = ${communityId},
+    "verificationLevel" = 'address_verified',
+    "homeLocation" = ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326),
+    "publicLocation" = ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)
+  WHERE id = ${user.sub}        
+`
+
+
+
+
+        const updatedUser = await prisma.user.findUnique({
             where: { id: user.sub },
-            data: {
-                communityId,
-                verificationLevel: VerificationLevel.email_verified,
-            },
             select: {
                 id: true,
                 email: true,
@@ -77,7 +88,20 @@ export async function verificationRoutes(app: FastifyInstance) {
             }
         })
 
-        return reply.send({ user: updated })
+        const producer = await getKafkaProducer()
+        await producer.send({
+            topic: 'user.events',
+            messages: [{
+                key: user.sub,
+                value: JSON.stringify({
+                    userId: user.sub,
+                    eventType: 'postcard_verified',
+                    occuredAt: new Date().toISOString(),
+                })
+            }]
+        })
+
+        return reply.send({ user: updatedUser })
     })
 
     // post /verification/request-postcard

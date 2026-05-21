@@ -1,0 +1,179 @@
+@communityUrl = http://localhost:3007
+@identityUrl = http://localhost:3001
+@communityId = a1b2c3d4-0000-0000-0000-000000000002
+
+### 1. Health
+GET {{communityUrl}}/health
+
+
+### ─────────────────────────────
+### SETUP
+### ─────────────────────────────
+
+### 2. Login as block captain
+POST {{identityUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123"
+}
+
+###
+
+@captainToken = PASTE_CAPTAIN_TOKEN_HERE
+@postId = PASTE_ANY_APPROVED_POST_ID_HERE
+@userId = PASTE_CAPTAIN_USER_ID_HERE
+
+
+### ─────────────────────────────
+### COMMUNITY INFO
+### ─────────────────────────────
+
+### 3. Get community info — public, no auth
+GET {{communityUrl}}/communities/{{communityId}}
+
+###
+
+### 4. Get non-existent community (should return 404)
+GET {{communityUrl}}/communities/00000000-0000-0000-0000-000000000000
+
+
+### ─────────────────────────────
+### CAPTAIN — PIN POST
+### ─────────────────────────────
+
+### 5. Pin a post — captain only
+POST {{communityUrl}}/communities/{{communityId}}/pin
+Authorization: Bearer {{captainToken}}
+Content-Type: application/json
+
+{
+  "postId": "{{postId}}"
+}
+
+###
+
+### 6. Pin without auth (should return 401)
+POST {{communityUrl}}/communities/{{communityId}}/pin
+Content-Type: application/json
+
+{
+  "postId": "{{postId}}"
+}
+
+###
+
+### 7. Verify pin is set — check community info
+GET {{communityUrl}}/communities/{{communityId}}
+
+###
+
+### 8. Unpin
+DELETE {{communityUrl}}/communities/{{communityId}}/pin
+Authorization: Bearer {{captainToken}}
+
+
+### ─────────────────────────────
+### CAPTAIN — ANNOUNCE
+### ─────────────────────────────
+
+### 9. Send block announcement
+POST {{communityUrl}}/communities/{{communityId}}/announce
+Authorization: Bearer {{captainToken}}
+Content-Type: application/json
+
+{
+  "title": "Block cleanup this Saturday",
+  "body": "Bring gloves and bags. Meeting at the park gate at 10am."
+}
+
+###
+
+### 10. Announce without auth (should return 401)
+POST {{communityUrl}}/communities/{{communityId}}/announce
+Content-Type: application/json
+
+{
+  "title": "Should fail",
+  "body": "No auth"
+}
+
+
+### ─────────────────────────────
+### CAPTAIN — REMOVE POST
+### ─────────────────────────────
+
+### 11. Remove a post as block captain
+DELETE {{communityUrl}}/communities/{{communityId}}/posts/{{postId}}
+Authorization: Bearer {{captainToken}}
+
+
+### ─────────────────────────────
+### POLLS
+### ─────────────────────────────
+
+### 12. Create poll
+POST {{communityUrl}}/polls
+Authorization: Bearer {{captainToken}}
+Content-Type: application/json
+
+{
+  "question": "What time works best for the block cleanup?",
+  "options": ["8am", "10am", "12pm", "2pm"],
+  "closesAt": "2026-12-31T23:59:59.000Z"
+}
+
+###
+
+@pollId = PASTE_POLL_ID_HERE
+@optionId = PASTE_OPTION_ID_HERE
+
+### 13. Get poll with vote tallies
+GET {{communityUrl}}/polls/{{pollId}}
+
+###
+
+### 14. Vote in poll
+POST {{communityUrl}}/polls/{{pollId}}/vote
+Authorization: Bearer {{captainToken}}
+Content-Type: application/json
+
+{
+  "optionId": "{{optionId}}"
+}
+
+###
+
+### 15. Vote again — should return 409 (already voted)
+POST {{communityUrl}}/polls/{{pollId}}/vote
+Authorization: Bearer {{captainToken}}
+Content-Type: application/json
+
+{
+  "optionId": "{{optionId}}"
+}
+
+###
+
+### 16. Get poll results after voting
+GET {{communityUrl}}/polls/{{pollId}}
+
+###
+
+### 17. List community polls
+GET {{communityUrl}}/communities/{{communityId}}/polls
+
+
+### ─────────────────────────────
+### CAPTAIN PROMOTION
+### ─────────────────────────────
+
+### 18. Promote another user to block captain
+PATCH {{communityUrl}}/communities/{{communityId}}/captain
+Authorization: Bearer {{captainToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}"
+}

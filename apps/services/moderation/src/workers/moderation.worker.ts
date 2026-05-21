@@ -6,6 +6,7 @@ import { analyzeText } from '../providers/text.provider'
 import { analyzeImage } from '../providers/image.provider'
 import prisma from '../plugins/prisma'
 import axios from 'axios'
+import { getKafkaProducer } from '../plugins/kafka'
 
 const QUEUE = 'moderation.jobs'
 
@@ -15,6 +16,7 @@ export interface ModerationJob {
     text: string       // title + body combined
     imageUrls: string[]
     trustScore: number   // high trust = more lenient threshold
+    communityId: string
     authorId: string
     type: string  // emergency, community, classified etc
 }
@@ -51,6 +53,35 @@ async function processJob(job: ModerationJob): Promise<void> {
     try {
         await axios.patch(`${postServiceUrl}/posts/${job.postId}/status`, {
             status: decision,
+        })
+
+        if (decision === 'approved') {
+            const producer = await getKafkaProducer()
+            await producer.send({
+                topic: 'post.created',
+                messages: [{
+                    key: job.postId,
+                    value: JSON.stringify({
+                        postId: job.postId,
+                        communityId: job.communityId,  // you'll need to add this to ModerationJob
+                        type: job.type,
+                        createdAt: new Date().toISOString(),
+                    })
+                }]
+            })
+        }
+
+        const producer = await getKafkaProducer()
+        await producer.send({
+            topic: 'user.events',
+            messages: [{
+                key: job.authorId,
+                value: JSON.stringify({
+                    userId: job.authorId,
+                    eventType: decision === 'approved' ? 'post_approved' : 'post_removed',
+                    occuredAt: new Date().toISOString(),
+                })
+            }]
         })
     } catch (error: any) {
         if (error.response?.status === 404) {

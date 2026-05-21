@@ -1,0 +1,112 @@
+@webhookUrl = http://localhost:3006
+@feedUrl = http://localhost:3004
+@identityUrl = http://localhost:3001
+
+### 1. Health
+GET {{webhookUrl}}/health
+
+
+### ─────────────────────────────────────────
+### WEBHOOK TESTS
+### Run generate-signature.ts first to get
+### the payload and signature values below
+### ─────────────────────────────────────────
+
+### 2. Valid webhook — roadworks notice
+### paste signature from generate-signature.ts output
+@noticeId = test-notice-PASTE_TIMESTAMP_HERE
+@signature = PASTE_SIGNATURE_HERE
+
+POST {{webhookUrl}}/webhooks/city-data
+Content-Type: application/json
+X-City-Portal-Signature: {{signature}}
+
+{
+  "noticeId": "{{noticeId}}",
+  "type": "roadworks",
+  "title": "Roadworks on Connaught Place Inner Circle",
+  "description": "Water main replacement. Expect delays. One-lane traffic from 9am to 5pm.",
+  "address": "Connaught Place, New Delhi, India",
+  "affectedRadiusMeters": 800,
+  "publishedAt": "2024-01-15T09:00:00.000Z"
+}
+
+###
+
+### 3. Same request again — should return 200 "Already processed" (idempotency)
+POST {{webhookUrl}}/webhooks/city-data
+Content-Type: application/json
+X-City-Portal-Signature: {{signature}}
+
+{
+  "noticeId": "{{noticeId}}",
+  "type": "roadworks",
+  "title": "Roadworks on Connaught Place Inner Circle",
+  "description": "Water main replacement. Expect delays. One-lane traffic from 9am to 5pm.",
+  "address": "Connaught Place, New Delhi, India",
+  "affectedRadiusMeters": 800,
+  "publishedAt": "2024-01-15T09:00:00.000Z"
+}
+
+###
+
+### 4. Missing signature (should return 401)
+POST {{webhookUrl}}/webhooks/city-data
+Content-Type: application/json
+
+{
+  "noticeId": "test-no-sig",
+  "type": "roadworks",
+  "title": "Should be rejected",
+  "description": "No signature provided",
+  "address": "Connaught Place, New Delhi, India",
+  "publishedAt": "2024-01-15T09:00:00.000Z"
+}
+
+###
+
+### 5. Wrong signature (should return 401)
+POST {{webhookUrl}}/webhooks/city-data
+Content-Type: application/json
+X-City-Portal-Signature: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+{
+  "noticeId": "test-bad-sig",
+  "type": "roadworks",
+  "title": "Should be rejected",
+  "description": "Wrong signature",
+  "address": "Connaught Place, New Delhi, India",
+  "publishedAt": "2024-01-15T09:00:00.000Z"
+}
+
+###
+
+### 6. Address that geocodes to outside all communities (should return no communities)
+### Run generate-signature.ts with a different address and paste here
+@sigNoMatch = PASTE_SIGNATURE_FOR_REMOTE_ADDRESS
+POST {{webhookUrl}}/webhooks/city-data
+Content-Type: application/json
+X-City-Portal-Signature: {{sigNoMatch}}
+
+{
+  "noticeId": "test-no-community",
+  "type": "planning_application",
+  "title": "Planning notice outside any community",
+  "description": "This address is far from any seeded community polygon",
+  "address": "Sydney Opera House, Sydney, Australia",
+  "affectedRadiusMeters": 100,
+  "publishedAt": "2024-01-15T09:00:00.000Z"
+}
+
+###
+
+### 7. Verify post appeared in feed after valid webhook
+### (login first to get token)
+@token = PASTE_TOKEN_HERE
+GET {{feedUrl}}/feed
+Authorization: Bearer {{token}}
+
+###
+
+### 8. Check idempotency key exists in Upstash
+### (check Upstash dashboard → Data Browser → search "idempotency:webhook:")
