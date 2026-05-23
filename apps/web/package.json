@@ -37,7 +37,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.6",
-    "@next/swc-win32-x64-msvc": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
