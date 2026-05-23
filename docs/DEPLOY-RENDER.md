@@ -40,7 +40,7 @@ Health: `http://localhost:10000/health` → `{ "status": "ok", "service": "neigh
 | `NODE_ENV` | `production` |
 | `GATEWAY_PORT` | `8080` (internal only) |
 
-**If the Node build fails** (no Go on Render’s native runtime), switch the service to **Docker** and set Dockerfile path to `apps/deploy/all/Dockerfile`.
+The build script auto-downloads Go on Linux when it is not preinstalled (Render native Node). **Docker** (`apps/deploy/all/Dockerfile`) is an alternative if you prefer a container deploy.
 
 Env vars: merge `apps/deploy/api/.env` + worker secrets — see `apps/deploy/all/.env.example`. Set `FRONTEND_URL` to your Vercel URL. `POST_SERVICE_URL` is optional (defaults to `http://127.0.0.1:$PORT`).
 
