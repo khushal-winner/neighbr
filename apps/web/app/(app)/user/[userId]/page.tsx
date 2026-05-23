@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/auth'
 import { identityApi } from '@/lib/api'
 import { Nav } from '@/components/Nav'
 import { TrustScoreInfo } from '@/components/TrustScoreInfo'
-import { ArrowLeft, MessageSquare, Shield, Calendar, Award, MapPin } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Shield, ShieldAlert, Calendar, Award, MapPin } from 'lucide-react'
 
 interface TargetUser {
     id: string
