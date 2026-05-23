@@ -266,10 +266,12 @@ export async function verificationRoutes(app: FastifyInstance) {
       try {
         await sendVerificationEmail(dbUser.email, code);
         console.log("[verification] Verification email sent to", dbUser.email);
-      } catch (emailErr) {
+      } catch (emailErr: any) {
         console.error("[verification] Failed to send verification email:", emailErr);
+        const errorMessage = emailErr?.message || String(emailErr);
         return reply.status(500).send({
-          error: "Could not send verification email. Please check SMTP settings or try again later.",
+          error: "Could not send verification email.",
+          details: errorMessage,
         });
       }
 
