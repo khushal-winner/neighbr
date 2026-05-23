@@ -4,16 +4,31 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+/** go.dev tarballs always use a full patch release (e.g. 1.22.10, not 1.24). */
+const FALLBACK_GO_VERSION = "1.22.10";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const gatewayDir = path.resolve(__dirname, "../../../gateway");
 const binDir = path.resolve(__dirname, "../bin");
 const outName = process.platform === "win32" ? "gateway.exe" : "gateway";
 const outPath = path.join(binDir, outName);
 
-function readGoVersion() {
+function readGoModVersion() {
   const mod = fs.readFileSync(path.join(gatewayDir, "go.mod"), "utf8");
   const match = mod.match(/^go\s+(\S+)/m);
-  return match?.[1] ?? "1.22.10";
+  return match?.[1] ?? FALLBACK_GO_VERSION;
+}
+
+/** Version string used for https://go.dev/dl/go{version}.linux-amd64.tar.gz */
+function resolveDownloadVersion() {
+  if (process.env.GO_DOWNLOAD_VERSION) {
+    return process.env.GO_DOWNLOAD_VERSION;
+  }
+  const modVersion = readGoModVersion();
+  const parts = modVersion.split(".");
+  // go.dev archives require major.minor.patch (go1.22.10, not go1.24)
+  if (parts.length >= 3) return modVersion;
+  return FALLBACK_GO_VERSION;
 }
 
 function hasGo(env) {
@@ -46,7 +61,7 @@ function installGo(version) {
   const cacheDir = path.join(os.tmpdir(), "neighbr-go-cache");
   const installRoot = path.join(cacheDir, `go${version}`);
   const goBin = path.join(installRoot, "go", "bin");
-  const goExe = path.join(goBin, process.platform === "win32" ? "go.exe" : "go");
+  const goExe = path.join(goBin, "go");
 
   if (fs.existsSync(goExe)) {
     console.log(`[build-gateway] Using cached Go at ${goBin}`);
@@ -59,7 +74,18 @@ function installGo(version) {
   const tarPath = path.join(cacheDir, archive);
 
   console.log(`[build-gateway] Go not found — downloading ${archive}`);
-  execSync(`curl -fsSL "${url}" -o "${tarPath}"`, { stdio: "inherit" });
+  try {
+    execSync(`curl -fsSL "${url}" -o "${tarPath}"`, { stdio: "inherit" });
+  } catch (err) {
+    if (version !== FALLBACK_GO_VERSION) {
+      console.warn(
+        `[build-gateway] Download failed for ${version}, retrying with ${FALLBACK_GO_VERSION}`,
+      );
+      return installGo(FALLBACK_GO_VERSION);
+    }
+    throw err;
+  }
+
   fs.mkdirSync(installRoot, { recursive: true });
   execSync(`tar -xzf "${tarPath}" -C "${installRoot}"`, { stdio: "inherit" });
 
@@ -75,10 +101,10 @@ function pathWithGo() {
   const env = { ...process.env };
   if (hasGo(env)) return env;
 
-  const version = readGoVersion();
+  const version = resolveDownloadVersion();
   const goBin = installGo(version);
   env.PATH = `${goBin}${path.delimiter}${env.PATH ?? ""}`;
-  env.GOTOOLCHAIN = env.GOTOOLCHAIN ?? "local";
+  env.GOTOOLCHAIN = "local";
 
   if (!hasGo(env)) {
     throw new Error("[build-gateway] Go install succeeded but `go` is still not on PATH");
