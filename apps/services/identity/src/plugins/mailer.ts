@@ -3,16 +3,16 @@ import nodemailer from "nodemailer";
 let transporter: nodemailer.Transporter | null = null;
 
 /**
- * Lazily initialise the Nodemailer SMTP transporter (Gmail).
+ * Lazily initialise the Nodemailer SMTP transporter (Brevo/Sendinblue).
  */
 function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
-    const host = process.env.SMTP_HOST;
+    const host = process.env.SMTP_HOST || "smtp-relay.brevo.com";
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
-    if (!host || !user || !pass) {
-      throw new Error("SMTP_HOST, SMTP_USER, and SMTP_PASS must be set");
+    if (!user) {
+      throw new Error("SMTP_USER (Brevo API key) must be set");
     }
 
     transporter = nodemailer.createTransport({
@@ -42,7 +42,7 @@ export async function sendVerificationEmail(
 
   try {
     await transport.sendMail({
-      from: process.env.SMTP_FROM || `"Neighbr" <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `"Neighbr" <thunderbolt8663@gmail.com>`,
       to,
       subject: "Your Neighbr verification code",
       text: `Your verification code is: ${code}\n\nEnter this code in the app to complete your identity verification.\n\nThis code expires in 7 days.`,
