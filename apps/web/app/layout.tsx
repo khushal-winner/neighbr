@@ -57,12 +57,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally runs once on mount
 
   useEffect(() => {
-    if (!user) return;
+    const userId = user?.id;
+    if (!userId) return;
 
     // Trust score may change while the app is open (someone upvoted a post)
     // Update Zustand immediately so any component reading trustScore sees the new value
     const unsub = subscribe("trust_updated", (data) => {
-      if (data.userId !== user.id) return; // not for this user
+      if (data.userId !== userId) return; // not for this user
       updateUser({
         trustScore: data.newScore as number,
         trustBand: data.trustBand as string,
