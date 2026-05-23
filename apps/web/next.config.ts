@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react"],
   },
 
+  // Next 16 uses Turbopack for `next build` by default; webpack is dev-only below.
+  turbopack: {},
+
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
