@@ -4,8 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** go.dev tarballs always use a full patch release (e.g. 1.22.10, not 1.24). */
-const FALLBACK_GO_VERSION = "1.22.10";
+/** go.dev tarballs use patch releases (go1.24.13), not bare go1.24. */
+const GO_PATCH_BY_MINOR = {
+  "1.24": "1.24.13",
+  "1.23": "1.23.6",
+  "1.22": "1.22.12",
+};
+const FALLBACK_GO_VERSION = "1.24.13";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const gatewayDir = path.resolve(__dirname, "../../../gateway");
@@ -15,20 +20,21 @@ const outPath = path.join(binDir, outName);
 
 function readGoModVersion() {
   const mod = fs.readFileSync(path.join(gatewayDir, "go.mod"), "utf8");
-  const match = mod.match(/^go\s+(\S+)/m);
-  return match?.[1] ?? FALLBACK_GO_VERSION;
+  const toolchain = mod.match(/^toolchain\s+go(\S+)/m);
+  if (toolchain?.[1]) return toolchain[1];
+  const goLine = mod.match(/^go\s+(\S+)/m);
+  return goLine?.[1] ?? FALLBACK_GO_VERSION;
 }
 
-/** Version string used for https://go.dev/dl/go{version}.linux-amd64.tar.gz */
 function resolveDownloadVersion() {
   if (process.env.GO_DOWNLOAD_VERSION) {
     return process.env.GO_DOWNLOAD_VERSION;
   }
   const modVersion = readGoModVersion();
   const parts = modVersion.split(".");
-  // go.dev archives require major.minor.patch (go1.22.10, not go1.24)
   if (parts.length >= 3) return modVersion;
-  return FALLBACK_GO_VERSION;
+  const minor = `${parts[0]}.${parts[1]}`;
+  return GO_PATCH_BY_MINOR[minor] ?? FALLBACK_GO_VERSION;
 }
 
 function hasGo(env) {
@@ -99,12 +105,15 @@ function installGo(version) {
 
 function pathWithGo() {
   const env = { ...process.env };
-  if (hasGo(env)) return env;
+  if (hasGo(env)) {
+    env.GOTOOLCHAIN = env.GOTOOLCHAIN ?? "local";
+    return env;
+  }
 
   const version = resolveDownloadVersion();
   const goBin = installGo(version);
   env.PATH = `${goBin}${path.delimiter}${env.PATH ?? ""}`;
-  env.GOTOOLCHAIN = "local";
+  env.GOTOOLCHAIN = `go${version}`;
 
   if (!hasGo(env)) {
     throw new Error("[build-gateway] Go install succeeded but `go` is still not on PATH");
