@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./consumers/notification": "./dist/consumers/notification.consumer.js"
+  },
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",

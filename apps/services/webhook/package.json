@@ -1,7 +1,11 @@
 {
-  "name": "webhook-service",
+  "name": "@neighbr/webhook",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./register": "./dist/register.js"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",

@@ -2,6 +2,10 @@
   "name": "@neighbr/digest",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./start": "./dist/start.js"
+  },
   "scripts": {
     "dev": "ts-node src/index.ts",
     "trigger": "ts-node src/scripts/trigger-now.ts",

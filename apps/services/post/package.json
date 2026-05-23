@@ -2,6 +2,14 @@
   "name": "@neighbr/post",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./register": "./dist/register.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./register": "./dist/register.js"
+  },
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",

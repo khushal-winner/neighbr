@@ -2,6 +2,14 @@
   "name": "@neighbr/identity",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./register": "./dist/register.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./register": "./dist/register.js"
+  },
   "prisma": {
     "schema": "../../../packages/db/prisma/schema.prisma"
   },

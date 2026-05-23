@@ -1,7 +1,11 @@
 {
   "name": "@neighbr/trust",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./consumers/trust": "./dist/consumers/trust.consumer.js"
+  },
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",

@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "build:deploy-api": "turbo run build --filter=@neighbr/deploy-api...",
+    "build:deploy-workers": "turbo run build --filter=@neighbr/deploy-workers...",
     "build:backend": "turbo run build --filter=./apps/services/* --filter=@neighbr/db --filter=@neighbr/config --concurrency=4",
     "build:gateway": "npm run build --workspace=@neighbr/gateway",
     "build:web": "turbo run build --filter=web",
@@ -23,6 +25,7 @@
   "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
+    "apps/deploy/*",
     "apps/services/*",
     "packages/*"
   ],

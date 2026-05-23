@@ -1,0 +1,30 @@
+{
+  "name": "@neighbr/deploy-api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/multipart": "^10.0.0",
+    "@neighbr/chat": "*",
+    "@neighbr/community": "*",
+    "@neighbr/feed": "*",
+    "@neighbr/identity": "*",
+    "@neighbr/moderation": "*",
+    "@neighbr/post": "*",
+    "@neighbr/webhook": "*",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.8.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.9.2"
+  }
+}

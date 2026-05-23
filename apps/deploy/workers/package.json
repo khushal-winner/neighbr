@@ -1,0 +1,24 @@
+{
+  "name": "@neighbr/deploy-workers",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neighbr/alert": "*",
+    "@neighbr/digest": "*",
+    "@neighbr/feed": "*",
+    "@neighbr/moderation": "*",
+    "@neighbr/notification": "*",
+    "@neighbr/trust": "*",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.9.2"
+  }
+}

@@ -2,6 +2,10 @@
   "name": "@neighbr/alert",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./consumers/alert": "./dist/consumers/alert.consumer.js"
+  },
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",
