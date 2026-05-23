@@ -29,7 +29,7 @@ declare module "firebase-admin" {
       notification: { title: string; body: string };
       data?: Record<string, string>;
       android?: { priority: string; notification: { sound: string } };
-      apns?: { payload: { app: { sound: string; badge: number } } };
+      apns?: { payload: { aps: { sound: string; badge: number } } };
     }
 
     interface Messaging {

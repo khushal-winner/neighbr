@@ -12,7 +12,7 @@ import (
 // StartHeartBeat refreshes presence TTLs for all connected users
 // runs as a background goroutine for the lifetime of the process
 func StartHeartBeat() {
-	ticker := time.NewTimer(30 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -37,8 +37,10 @@ func refreshPresence() {
 	pipe := redisclient.Client.Pipeline()
 
 	for _, client := range snapshot {
+		if client.CommunityID == "" {
+			continue
+		}
 		key := fmt.Sprintf("presence:%s", client.CommunityID)
-		// update timestamp and reset TTL
 		pipe.HSet(ctx, key, client.UserID, time.Now().Unix())
 		pipe.Expire(ctx, key, 90*time.Second)
 	}

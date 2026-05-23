@@ -37,11 +37,13 @@ model Poll {
   communityId String
   community   MicroCommunity @relation(fields: [communityId], references: [id])
   createdById String
+  createdBy   User           @relation(fields: [createdById], references: [id])
   question    String
   closesAt    DateTime? //null = open indefinitely
   createdAt   DateTime       @default(now())
   options     PollOption[]
   votes       PollVote[]
+  feedPost    Post?
 }
 
 model PollOption {
@@ -69,7 +71,8 @@ model User {
   email             String                   @unique
   passwordHash      String
   displayName       String
-  verificationLevel String                   @default("unverified")
+  avatarUrl         String?
+  verificationLevel VerificationLevel          @default(unverified)
   trustScore        Int                      @default(0)
   communityId       String?
   notificationPrefs Json                     @default("{}")
@@ -79,6 +82,8 @@ model User {
   posts             Post[]
   fcmTokens         FcmToken[]
   community         MicroCommunity?          @relation(fields: [communityId], references: [id])
+  chatMessages      ChatMessage[]
+  createdPolls      Poll[]
 
   @@index([homeLocation], map: "idx_user_home_location", type: Gist)
 }
@@ -94,10 +99,25 @@ model Post {
   moderationStatus String         @default("pending")
   upvotes          Int            @default(0)
   flagCount        Int            @default(0)
+  pollId           String?        @unique
+  poll             Poll?          @relation(fields: [pollId], references: [id])
   createdAt        DateTime       @default(now())
+  interactions     PostInteraction[]
   author           User           @relation(fields: [authorId], references: [id])
   community        MicroCommunity @relation(fields: [communityId], references: [id])
 }
+
+model PostInteraction {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  type      String   // "upvote" or "flag"
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([postId, userId, type]) // one upvote + one flag per user per post
+}
+
 
 model ModerationDecision {
   id        String   @id @default(uuid())
@@ -139,6 +159,7 @@ model ChatMessage {
   threadId  String
   thread    ChatThread @relation(fields: [threadId], references: [id])
   senderId  String
+  sender    User       @relation(fields: [senderId], references: [id])
   body      String
   readAt    DateTime?
   createdAt DateTime   @default(now())
@@ -156,6 +177,7 @@ model spatial_ref_sys {
 enum VerificationLevel {
   unverified
   email_verified
+  address_verified
   postcard_verified
 }
 

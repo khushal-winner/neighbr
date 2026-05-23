@@ -1,166 +1,238 @@
-import { FastifyInstance } from 'fastify'
-import { requireAuth } from '../plugins/auth'
-import prisma from '../plugins/prisma'
-import { getRedis } from '../plugins/redis'
+import { FastifyInstance } from "fastify";
+import { requireAuth } from "../plugins/auth";
+import prisma from "../plugins/prisma";
+import { getRedis } from "../plugins/redis";
 
 // trust band labels - same logic as Identity service
 // duplicated here intentionally - services shouldn't share runtime code, only types
 function getTrustBand(score: number): string {
-    if (score >= 200) return 'Community Pillar'
-    if (score >= 100) return 'Trusted Neighbour'
-    if (score >= 30) return 'Resident'
-    return 'New Resident'
+  if (score >= 200) return "Community Pillar";
+  if (score >= 100) return "Trusted Neighbour";
+  if (score >= 30) return "Resident";
+  return "New Resident";
 }
 
 export async function feedRoutes(app: FastifyInstance) {
+  // get /feed
+  // require auth - we read communityId from JWT so users only see their block
+  app.get("/feed", { preHandler: requireAuth }, async (request, reply) => {
+    try {
+    const jwtUser = request.user as { sub: string };
 
-    // get /feed
-    // require auth - we read communityId from JWT so users only see their block
-    app.get('/feed', { preHandler: requireAuth }, async (request, reply) => {
-        const user = request.user as {
-            sub: string
-            communityId: string | null
-        }
+    const dbUser = await prisma.user.findUnique({
+      where: { id: jwtUser.sub },
+      select: { communityId: true },
+    });
 
-        if (!user.communityId) {
-            return reply.status(400).send({
-                error: 'You must verify your address before viewing the feed'
-            })
-        }
+    if (!dbUser?.communityId) {
+      return reply.status(400).send({
+        error: "You must verify your address before viewing the feed",
+      });
+    }
 
-        const query = request.query as {
-            cursor?: string  // Unix timestamp - fetch posts older than this
-            limit?: string
-        }
+    const communityId = dbUser.communityId;
 
-        const limit = Math.min(parseInt(query.limit ?? '20', 10), 50)
-        const cursor = query.cursor ? parseInt(query.cursor, 10) : Date.now()
+    const query = request.query as {
+      cursor?: string; // Unix timestamp - fetch posts older than this
+      limit?: string;
+    };
 
-        const redis = getRedis()
-        const key = `feed:${user.communityId}`
+    const limit = Math.min(parseInt(query.limit ?? "20", 10), 50);
+    const cursorScore = query.cursor ? parseInt(query.cursor, 10) : null;
+    const redisMax = cursorScore !== null ? `(${cursorScore}` : "+inf";
 
-        // ZREVRANGEBYSCORE - get postIds from newest to oldest, starting before cursor
-        // Upstash Redis uses different method names than ioredis
-        const postIds = await redis.zrange(
-            key,
-            0,
-            limit,
-            { rev: true, byScore: true }
-        )
+    const key = `feed:${communityId}`;
 
-        if (postIds.length === 0) {
-            // Fallback: query database directly if Redis is empty (e.g., Kafka consumer not running)
-            console.log(`[Feed] Redis empty for community ${user.communityId}, using DB fallback`)
-            const posts = await prisma.post.findMany({
-                where: {
-                    communityId: user.communityId,
-                    moderationStatus: 'approved',
-                },
-                include: {
-                    author: {
-                        select: {
-                            id: true,
-                            displayName: true,
-                            verificationLevel: true,
-                            trustScore: true,
-                        }
-                    }
-                },
-                orderBy: { createdAt: 'desc' },
-                take: limit,
-            })
+    let postIds: string[] = [];
+    let nextCursor: number | null = null;
 
-            const shaped = posts.map(post => ({
-                ...post,
-                author: {
-                    ...post.author,
-                    trustBand: getTrustBand(post.author.trustScore),
-                }
-            }))
+    try {
+      const redis = getRedis();
+      const raw = (await redis.zrevrangebyscore(
+        key,
+        redisMax,
+        "-inf",
+        "WITHSCORES",
+        "LIMIT",
+        0,
+        limit,
+      )) as string[];
 
-            return reply.send({
-                posts: shaped,
-                nextCursor: posts.length > 0 ? posts[posts.length - 1].createdAt.getTime() : null
-            })
-        }
+      for (let i = 0; i < raw.length; i += 2) {
+        postIds.push(raw[i]);
+      }
+      nextCursor =
+        raw.length >= 2 ? Math.floor(Number(raw[raw.length - 1])) : null;
+    } catch (redisErr) {
+      console.warn("[Feed] Redis unavailable, using database only:", redisErr);
+      postIds = [];
+    }
 
-        // one DB query for all post IDs - never N+1
-        const posts = await prisma.post.findMany({
-            where: {
-                id: { in: postIds as string[] },
-                moderationStatus: 'approved', // safety net - should already be filtered at index time
+    if (!postIds.length) {
+      // Fallback: query database directly if Redis is empty (e.g., Kafka consumer not running)
+      console.log(
+        `[Feed] Redis empty for community ${communityId}, using DB fallback`,
+      );
+      const posts = await prisma.post.findMany({
+        where: {
+          communityId,
+          moderationStatus: "approved",
+          type: { not: "emergency" }, // emergencies go via WebSocket alerts, not feed
+          ...(cursorScore !== null
+            ? { createdAt: { lt: new Date(cursorScore) } }
+            : {}),
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              displayName: true,
+              verificationLevel: true,
+              trustScore: true,
             },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        displayName: true,
-                        verificationLevel: true,
-                        trustScore: true,
-                    }
-                }
-            }
-        })
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
 
-        // re-sort to match redis order (db query don't gurantee it)
-        const orderMap = new Map<string, number>((postIds as string[]).map((id: string, i: number) => [id, i]))
-        posts.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0))
+      const shaped = posts.map((post) => ({
+        ...post,
+        author: {
+          ...post.author,
+          trustBand: getTrustBand(post.author.trustScore),
+        },
+      }));
 
-        // shape the response - add trust band to author
-        const shaped = posts.map(post => ({
-            ...post,
-            author: {
-                ...post.author,
-                trustBand: getTrustBand(post.author.trustScore),
-            }
-        }))
+      return reply.send({
+        posts: shaped,
+        nextCursor:
+          posts.length === limit
+            ? posts[posts.length - 1].createdAt.getTime()
+            : null,
+      });
+    }
 
-        // the next cursor is the score of the last post returned
-        // frontend passes this back on the next scroll request
-        const lastPostId = postIds[postIds.length - 1]
-        const lastScore = await redis.zscore(key, lastPostId)
-        const nextCursor = lastScore ? Math.floor(lastScore) : null
+    // one DB query for all post IDs - never N+1
+    const posts = await prisma.post.findMany({
+      where: {
+        id: { in: postIds as string[] },
+        moderationStatus: "approved",
+        type: { not: "emergency" },
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            displayName: true,
+            verificationLevel: true,
+            trustScore: true,
+          },
+        },
+      },
+    });
 
-        return reply.send({
-            posts: shaped,
-            nextCursor, // null means no more posts
-        })
+    // re-sort to match redis order (db query don't gurantee it)
+    const orderMap = new Map<string, number>(
+      (postIds as string[]).map((id: string, i: number) => [id, i]),
+    );
+    posts.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
-    })
+    // shape the response - add trust band to author
+    const shaped = posts.map((post) => ({
+      ...post,
+      author: {
+        ...post.author,
+        trustBand: getTrustBand(post.author.trustScore),
+      },
+    }));
 
+    // the next cursor was already extracted from the ZREVRANGEBYSCORE reply above
+    // (nextCursor = score of the last returned member)
+  // If Redis index missed posts (e.g. polls), merge recent approved DB posts on first page
+    let merged = shaped;
+    if (cursorScore === null && shaped.length < limit) {
+      const dbPosts = await prisma.post.findMany({
+        where: {
+          communityId,
+          moderationStatus: "approved",
+          type: { not: "emergency" },
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              displayName: true,
+              verificationLevel: true,
+              trustScore: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+      const seen = new Set(shaped.map((p) => p.id));
+      const extras = dbPosts
+        .filter((p) => !seen.has(p.id))
+        .map((post) => ({
+          ...post,
+          author: {
+            ...post.author,
+            trustBand: getTrustBand(post.author.trustScore),
+          },
+        }));
+      merged = [...shaped, ...extras]
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
+        .slice(0, limit);
+    }
 
+    return reply.send({
+      posts: merged,
+      nextCursor:
+        merged.length === limit && nextCursor !== null ? nextCursor : null,
+    });
+    } catch (err) {
+      console.error("[Feed] GET /feed failed:", err);
+      return reply.status(500).send({
+        error: "Could not load feed",
+      });
+    }
+  });
 
-    // get /feed/post/:id
-    // fetch a single approved post - used when opening a post from notification
-    app.get('/feed/post/:id', async (request, reply) => {
-        const { id } = request.params as { id: string }
+  // get /feed/post/:id
+  // fetch a single approved post - used when opening a post from notification
+  app.get("/feed/post/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
 
-        const post = await prisma.post.findUnique({
-            where: { id, moderationStatus: 'approved' },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        displayName: true,
-                        verificationLevel: true,
-                        trustScore: true,
-                    }
-                }
-            }
-        })
+    const post = await prisma.post.findUnique({
+      where: { id, moderationStatus: "approved" },
+      include: {
+        author: {
+          select: {
+            id: true,
+            displayName: true,
+            verificationLevel: true,
+            trustScore: true,
+          },
+        },
+      },
+    });
 
-        if (!post) {
-            return reply.status(404).send({ error: 'Post not found' })
-        }
+    if (!post) {
+      return reply.status(404).send({ error: "Post not found" });
+    }
 
-        return reply.send({
-            post: {
-                ...post,
-                author: {
-                    ...post.author,
-                    trustBand: getTrustBand(post.author.trustScore),
-                }
-            }
-        })
-    })
+    return reply.send({
+      post: {
+        ...post,
+        author: {
+          ...post.author,
+          trustBand: getTrustBand(post.author.trustScore),
+        },
+      },
+    });
+  });
 }

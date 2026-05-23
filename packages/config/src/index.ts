@@ -42,6 +42,5 @@ if (!parsed.success) {
     console.error(parsed.error.flatten().fieldErrors)
     process.exit(1)
 }
-
 export const env = parsed.data
 export type Env = typeof parsed.data

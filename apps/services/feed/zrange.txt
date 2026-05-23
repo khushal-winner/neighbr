@@ -1,0 +1,19 @@
+ as ZDiffStoreCommand, bQ as ZIncrByCommand, bR as ZInterStoreCommand, bS as ZInterStoreCommandOptions, bT as ZLexCountCommand, bU as ZMScoreCommand, bV as ZPopMaxCommand, bW as ZPopMinCommand, bX as ZRangeCommand, bY as ZRangeCommandOptions, bZ as ZRankCommand, b_ as ZRemCommand, b$ as ZRemRangeByLexCommand, c0 as ZRemRangeByRankCommand, c1 as ZRemRangeByScoreCommand, c2 as ZRevRankCommand, c3 as ZScanCommand, c4 as ZScoreCommand, c5 as ZUnionCommand, c6 as ZUnionCommandOptions, c7 as ZUnionStoreCommand, c8 as ZUnionStoreCommandOptions, c9 as errors } from './error-8y4qG0W2.js';
+
+type TextFieldBuild<TNoTokenize extends Record<"noTokenize", boolean>, TNoStem extends Record<"noStem", boolean>, TFrom extends Record<"from", string | null>> = TNoTokenize["noTokenize"] extends true ? {
+    type: "TEXT";
+    noTokenize: true;
+} & (TNoStem["noStem"] extends true ? {
+    noStem: true;
+} : {}) & (TFrom["from"] extends string ? {
+    from: TFrom["from"];
+} : {}) : TNoStem["noStem"] extends true ? {
+    type: "TEXT";
+    noStem: true;
+} & (TFrom["from"] extends string ? {
+    from: TFrom["from"];
+} : {}) : TFrom["from"] extends string ? {
+    type: "TEXT";
+    from: TFrom["from"];
+} : {
+    t

@@ -1,12 +1,26 @@
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import prisma from '../plugins/prisma'
 import { requireAuth } from '../plugins/auth'
+import {
+    fetchPollById,
+    fetchPollsForCommunity,
+    getUserCommunityId,
+} from '../lib/polls'
+import { ensurePollFeedPost } from '../lib/pollFeedPost'
+import { indexPostInFeed, notifyFeedPostApproved } from '../lib/feedIndex'
+
+async function optionalUserId(request: FastifyRequest): Promise<string | null> {
+    try {
+        await request.jwtVerify()
+        return (request.user as { sub: string }).sub
+    } catch {
+        return null
+    }
+}
 
 export async function pollRoutes(app: FastifyInstance) {
-
-    // POST /polls
-    // any verified resident can create a poll in their community
+    // POST /polls — verified residents create block polls
     app.post('/polls', { preHandler: requireAuth }, async (request, reply) => {
         const Schema = z.object({
             question: z.string().min(5).max(300),
@@ -22,9 +36,10 @@ export async function pollRoutes(app: FastifyInstance) {
             })
         }
 
-        const user = request.user as { sub: string; communityId: string | null }
+        const jwtUser = request.user as { sub: string }
+        const communityId = await getUserCommunityId(jwtUser.sub)
 
-        if (!user.communityId) {
+        if (!communityId) {
             return reply.status(400).send({
                 error: 'You must verify your address before creating polls',
             })
@@ -32,83 +47,65 @@ export async function pollRoutes(app: FastifyInstance) {
 
         const poll = await prisma.poll.create({
             data: {
-                communityId: user.communityId,
-                createdById: user.sub,
-                question: body.data.question,
+                communityId,
+                createdById: jwtUser.sub,
+                question: body.data.question.trim(),
                 closesAt: body.data.closesAt ? new Date(body.data.closesAt) : null,
                 options: {
-                    create: body.data.options.map(text => ({ text })),
+                    create: body.data.options.map((text) => ({ text: text.trim() })),
                 },
             },
             include: {
-                options: true,
-            },
-        })
-
-        return reply.status(201).send({ poll })
-    })
-
-
-    // GET /polls/:pollId
-    // get poll with current vote tallies
-    // public — anyone can see poll results
-    app.get('/polls/:pollId', async (request, reply) => {
-        const { pollId } = request.params as { pollId: string }
-
-        const poll = await prisma.poll.findUnique({
-            where: { id: pollId },
-            include: {
                 options: {
-                    include: {
-                        _count: { select: { votes: true } },
-                    },
+                    include: { _count: { select: { votes: true } } },
                 },
                 _count: { select: { votes: true } },
             },
         })
 
+        const post = await prisma.post.create({
+            data: {
+                authorId: jwtUser.sub,
+                communityId,
+                type: 'poll',
+                title: poll.question.slice(0, 200),
+                body: poll.question,
+                moderationStatus: 'approved',
+                pollId: poll.id,
+                imageUrls: [],
+                createdAt: poll.createdAt,
+            },
+        })
+
+        await indexPostInFeed(communityId, post.id, poll.createdAt)
+        await notifyFeedPostApproved(communityId, post.id, post.title)
+
+        await ensurePollFeedPost(poll.id)
+        const shaped = await fetchPollById(poll.id, jwtUser.sub)
+        return reply.status(201).send({ poll: shaped })
+    })
+
+    // GET /polls/:pollId
+    app.get('/polls/:pollId', async (request, reply) => {
+        const { pollId } = request.params as { pollId: string }
+        const userId = await optionalUserId(request)
+        await ensurePollFeedPost(pollId)
+        const poll = await fetchPollById(pollId, userId)
+
         if (!poll) {
             return reply.status(404).send({ error: 'Poll not found' })
         }
 
-        const isClosed = poll.closesAt
-            ? new Date() > poll.closesAt
-            : false
-
-        // shape response — add vote count per option and percentage
-        const totalVotes = poll._count.votes
-
-        const options = poll.options.map(opt => ({
-            id: opt.id,
-            text: opt.text,
-            votes: opt._count.votes,
-            percentage: totalVotes > 0
-                ? Math.round((opt._count.votes / totalVotes) * 100)
-                : 0,
-        }))
-
-        return reply.send({
-            poll: {
-                id: poll.id,
-                question: poll.question,
-                communityId: poll.communityId,
-                closesAt: poll.closesAt,
-                isClosed,
-                totalVotes,
-                options,
-            },
-        })
+        return reply.send({ poll })
     })
 
-
     // POST /polls/:pollId/vote
-    // cast a vote — one per user per poll enforced by DB unique constraint
     app.post(
         '/polls/:pollId/vote',
         { preHandler: requireAuth },
         async (request, reply) => {
             const { pollId } = request.params as { pollId: string }
-            const user = request.user as { sub: string; communityId: string | null }
+            const jwtUser = request.user as { sub: string }
 
             const Schema = z.object({
                 optionId: z.string().uuid(),
@@ -119,7 +116,13 @@ export async function pollRoutes(app: FastifyInstance) {
                 return reply.status(400).send({ error: 'optionId is required' })
             }
 
-            // verify poll exists and belongs to user's community
+            const communityId = await getUserCommunityId(jwtUser.sub)
+            if (!communityId) {
+                return reply.status(400).send({
+                    error: 'You must verify your address before voting',
+                })
+            }
+
             const poll = await prisma.poll.findUnique({
                 where: { id: pollId },
                 select: {
@@ -133,7 +136,7 @@ export async function pollRoutes(app: FastifyInstance) {
                 return reply.status(404).send({ error: 'Poll not found' })
             }
 
-            if (poll.communityId !== user.communityId) {
+            if (poll.communityId !== communityId) {
                 return reply.status(403).send({
                     error: 'You can only vote in your own community polls',
                 })
@@ -143,7 +146,6 @@ export async function pollRoutes(app: FastifyInstance) {
                 return reply.status(400).send({ error: 'This poll is closed' })
             }
 
-            // verify option belongs to this poll
             const option = await prisma.pollOption.findUnique({
                 where: { id: body.data.optionId },
                 select: { id: true, pollId: true },
@@ -154,62 +156,53 @@ export async function pollRoutes(app: FastifyInstance) {
             }
 
             try {
-                // unique constraint [pollId, userId] prevents double voting at DB level
-                // if user already voted this throws and we catch it below
                 await prisma.pollVote.create({
                     data: {
                         pollId,
                         optionId: body.data.optionId,
-                        userId: user.sub,
+                        userId: jwtUser.sub,
                     },
                 })
-            } catch (err: any) {
-                // Prisma unique constraint violation code
-                if (err?.code === 'P2002') {
-                    return reply.status(409).send({ error: 'You have already voted in this poll' })
+            } catch (err: unknown) {
+                const code = (err as { code?: string })?.code
+                if (code === 'P2002') {
+                    return reply.status(409).send({
+                        error: 'You have already voted in this poll',
+                    })
                 }
                 throw err
             }
 
-            return reply.status(201).send({ message: 'Vote recorded' })
-        }
+            const shaped = await fetchPollById(pollId, jwtUser.sub)
+            return reply.status(201).send({
+                message: 'Vote recorded',
+                poll: shaped,
+            })
+        },
     )
-
 
     // GET /communities/:communityId/polls
-    // list all polls for a community — newest first
     app.get(
         '/communities/:communityId/polls',
+        { preHandler: requireAuth },
         async (request, reply) => {
+            const jwtUser = request.user as { sub: string }
             const { communityId } = request.params as { communityId: string }
-
             const query = request.query as { cursor?: string; limit?: string }
-            const limit = Math.min(parseInt(query.limit ?? '10', 10), 50)
-            const cursor = query.cursor ? new Date(query.cursor) : new Date()
 
-            const polls = await prisma.poll.findMany({
-                where: {
-                    communityId,
-                    createdAt: { lt: cursor },
-                },
-                orderBy: { createdAt: 'desc' },
-                take: limit,
-                include: {
-                    options: {
-                        include: {
-                            _count: { select: { votes: true } },
-                        },
-                    },
-                    _count: { select: { votes: true } },
-                },
+            const userCommunityId = await getUserCommunityId(jwtUser.sub)
+            if (!userCommunityId || userCommunityId !== communityId) {
+                return reply.status(403).send({ error: 'You are not in this community' })
+            }
+
+            const limit = Math.min(parseInt(query.limit ?? '20', 10), 50)
+            const { polls, nextCursor } = await fetchPollsForCommunity(communityId, {
+                cursor: query.cursor,
+                limit,
+                userId: jwtUser.sub,
             })
 
-            const nextCursor = polls.length === limit
-                ? polls[polls.length - 1].createdAt.toISOString()
-                : null
-
             return reply.send({ polls, nextCursor })
-        }
+        },
     )
-
 }

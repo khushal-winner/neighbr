@@ -3,7 +3,10 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "build:backend": "turbo run build --filter=./apps/services/* --filter=@neighbr/db --filter=@neighbr/config --concurrency=4",
+    "build:gateway": "npm run build --workspace=@neighbr/gateway",
+    "build:web": "turbo run build --filter=web",
+    "dev": "turbo run dev --filter=./apps/services/* --filter=./apps/web --filter=./apps/gateway",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"

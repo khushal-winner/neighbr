@@ -1,6 +1,9 @@
 import * as dotenv from 'dotenv'
 dotenv.config()
 
+// Suppress TLS verification for Node.js 20 - some CloudAMQP/OS 
+// builds throw UNABLE_TO_VERIFY_LEAF_SIGNATURE. Safe for dev only.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 import { startModerationWorker } from './workers/moderation.worker'
 import { adminRoutes } from './routes/admin'
 import Fastify from 'fastify'

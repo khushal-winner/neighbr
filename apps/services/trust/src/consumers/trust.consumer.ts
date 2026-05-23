@@ -3,6 +3,7 @@ dotenv.config()
 
 import { Kafka, logLevel } from 'kafkajs'
 import prisma from '../plugins/prisma'
+import { getRedis } from '../plugins/redis'
 import {
     TRUST_DELTAS,
     TrustEventType,
@@ -68,6 +69,18 @@ async function processEvent(event: UserEvent): Promise<void> {
 
     const newBand = getTrustBand(updatedUser.trust_score)
     console.log(`[Trust] User ${event.userId} score: ${updatedUser.trust_score} (${newBand})`)
+
+    // Publish to user's personal WS channel — Gateway delivers it if they're online
+    // If they're not online, they'll see the updated score next time they open the profile
+    const redis = getRedis()
+    await redis.publish(`ws:user:${event.userId}`, JSON.stringify({
+        type: 'trust_updated',
+        userId: event.userId,
+        newScore: updatedUser.trust_score,
+        trustBand: newBand,
+        delta,
+        eventType: event.eventType,
+    }))
 }
 
 export async function startTrustConsumer(): Promise<void> {
@@ -89,30 +102,37 @@ export async function startTrustConsumer(): Promise<void> {
         // set to 'latest' in production after initial deploy
     })
 
-    await consumer.connect()
-    await consumer.subscribe({ topic: 'user.events', fromBeginning: false })
+    try {
+        await consumer.connect()
+        await consumer.subscribe({ topic: 'user.events', fromBeginning: false })
 
-    console.log(`[Trust] consumer connected , listenting on user.events`)
+        console.log(`[Trust] consumer connected , listenting on user.events`)
 
-    await consumer.run({
-        // proccess one message at a time - trust score updates must be ordered per user
-        // eachMessage guarantees order within a partiiton (Kafka partition by key = userId)
-        eachMessage: async ({ message }) => {
-            if (!message.value) return
+        await consumer.run({
+            // proccess one message at a time - trust score updates must be ordered per user
+            // eachMessage guarantees order within a partiiton (Kafka partition by key = userId)
+            eachMessage: async ({ message }) => {
+                if (!message.value) return
 
-            try {
-                const event: UserEvent = JSON.parse(message.value.toString())
-                await processEvent(event)
-            } catch (err) {
-                // log but don't rethrow - a bad message shouldn't stop the consumer 
-                // in production: publish to dead-letter topic for investigation
-                console.error(`[Trust] failed to process event:`, err)
+                try {
+                    const event: UserEvent = JSON.parse(message.value.toString())
+                    await processEvent(event)
+                } catch (err) {
+                    // log but don't rethrow - a bad message shouldn't stop the consumer 
+                    // in production: publish to dead-letter topic for investigation
+                    console.error(`[Trust] failed to process event:`, err)
+                }
             }
-        }
-    })
+        })
+    } catch (err) {
+        console.warn(`[Trust] Kafka connection/subscription failed (possibly topic authorization issue):`, err)
+        console.warn(`[Trust] Trust service remains active, but scoring updates will be skipped until Kafka topics are configured.`)
+    }
 
     process.on('SIGTERM', async () => {
-        await consumer.disconnect()
+        try {
+            await consumer.disconnect()
+        } catch {}
         process.exit(0)
     })
 }

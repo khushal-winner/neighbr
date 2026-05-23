@@ -50,7 +50,7 @@
 │  :3005   │
 ├──────────┤               ┌──────────────────────────┐
 │Webhook   │               │  BullMQ (Redis queues)    │
-│  :3006   │               │  (digest + notification)  │
+│  :3008   │               │  (digest + notification)  │
 ├──────────┤               └──────────────────────────┘
 │Community │
 │  :3007   │               ┌──────────────────────────┐
@@ -210,7 +210,7 @@ cd apps/services/post     && npm run dev     # Post      — port 3002
 cd apps/services/moderation && npm run dev   # Moderation — port 3003
 cd apps/services/feed      && npm run dev     # Feed      — port 3004
 cd apps/services/chat      && npm run dev     # Chat      — port 3005
-cd apps/services/webhook   && npm run dev     # Webhook   — port 3006
+cd apps/services/webhook   && npm run dev     # Webhook   — port 3008
 cd apps/services/community && npm run dev     # Community — port 3007
 cd apps/services/notification && npm run dev  # Notification worker
 cd apps/services/alert     && npm run dev     # Alert worker
@@ -270,7 +270,7 @@ Alert triggers ──► Kafka: alerts.delhi ──► Alert service (PostGIS ge
 | `@neighbr/moderation`   | 3003 | HTTP + Worker | AI content analysis via RabbitMQ consumer; admin verdict API                |
 | `@neighbr/feed`         | 3004 | HTTP + Worker | Feed reads through Redis sorted-sets; Kafka consumer for post events        |
 | `@neighbr/chat`         | 3005 | HTTP          | Direct messages, group chat rooms, presence                                 |
-| `@neighbr/webhook`      | 3006 | HTTP          | Incoming webhook endpoint                                                   |
+| `@neighbr/webhook`      | 3008 | HTTP          | Incoming webhook endpoint                                                   |
 | `@neighbr/community`    | 3007 | HTTP          | Micro-community CRUD, community polls                                       |
 | `@neighbr/notification` | —    | Worker        | Firebase FCM push, batched per community through a configurable time window |
 | `@neighbr/alert`        | —    | Worker        | PostGIS radius-based emergency alert fan-out per user                       |

@@ -30,6 +30,7 @@ export interface ModerationJob {
     trustScore: number
     authorId: string
     type: string
+    communityId: string
 }
 
 

@@ -51,15 +51,50 @@ export async function startNotificationConsumer(): Promise<void> {
 
     const consumer = kafka.consumer({ groupId: "notification-batcher" });
 
-    await consumer.connect();
+    try {
+        await consumer.connect();
 
-    // consumer both topics - approved regular posts and emergency alerts
-    await consumer.subscribe({
-        topics: ["post.created", "alerts.delhi"],
-        fromBeginning: false,
-    });
+        // consumer both topics - approved regular posts and emergency alerts
+        await consumer.subscribe({
+            topics: ["post.created", "alerts.delhi"],
+            fromBeginning: false,
+        });
 
-    console.log(`[Notification Consumer connected]`);
+        console.log(`[Notification Consumer connected]`);
+
+        await consumer.run({
+            eachMessage: async ({ topic, message }) => {
+                if (!message.value) return;
+
+                try {
+                    const event: PostCreatedEvent = JSON.parse(message.value.toString());
+
+                    // emergency alerts bypass the window - deliver immediately
+                    if (topic.startsWith("alerts") || event.type === "emergency") {
+                        await sendEmergencyNotification(event);
+                        return;
+                    }
+
+                    // regular posts go into the accumulator for the next window flush
+                    accumulate({
+                        postId: event.postId,
+                        communityId: event.communityId,
+                        type: event.type,
+                        title: event.title,
+                    });
+
+                    console.log(
+                        `[Notification] Accumulated post ${event.postId} for community ${event.communityId}`,
+                    );
+                } catch (err) {
+                    console.error(`[Notification] Message processing error:`, err);
+                }
+            },
+        });
+    } catch (err) {
+        console.warn(`[Notification] Kafka connection/subscription failed (possibly topic authorization issue):`, err);
+        console.warn(`[Notification] Service remains active, but background push notifications will be skipped until Kafka topics are configured.`);
+    }
 
     // start the window timer - flushes every NOTIFICATION_WINDOW_MS (default 1 hr)
     const windowMs = parseInt(
@@ -78,36 +113,6 @@ export async function startNotificationConsumer(): Promise<void> {
     console.log(
         `[Notification] window timer set: ${windowMs / 1000 / 60} minutes`,
     );
-
-    await consumer.run({
-        eachMessage: async ({ topic, message }) => {
-            if (!message.value) return;
-
-            try {
-                const event: PostCreatedEvent = JSON.parse(message.value.toString());
-
-                // emergency alerts bypass the window - deliver immediately
-                if (topic.startsWith("alerts") || event.type === "emergency") {
-                    await sendEmergencyNotification(event);
-                    return;
-                }
-
-                // regular posts go into the accumulator for the next window flush
-                accumulate({
-                    postId: event.postId,
-                    communityId: event.communityId,
-                    type: event.type,
-                    title: event.title,
-                });
-
-                console.log(
-                    `[Notification] Accumulated post ${event.postId} for community ${event.communityId}`,
-                );
-            } catch (err) {
-                console.error(`[Notification] Message processing error:`, err);
-            }
-        },
-    });
 
     process.on("SIGTERM", async () => {
         clearInterval(windowTimer);

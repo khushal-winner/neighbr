@@ -12,7 +12,6 @@ build/
 .env
 .env.local
 .env.production
-*.env
 
 # Prisma generated client
 **/generated/
@@ -33,6 +32,5 @@ Thumbs.db
 # Test coverage
 coverage/
 
-*.json
 firebase-service-account.json
 firebase-service-account.json.json

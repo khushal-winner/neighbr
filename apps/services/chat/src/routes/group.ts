@@ -4,18 +4,26 @@ import prisma from "../plugins/prisma";
 import { z } from "zod";
 import { getRedis } from "../plugins/redis";
 
-
+async function userBelongsToCommunity(
+    userId: string,
+    communityId: string,
+): Promise<boolean> {
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { communityId: true },
+    });
+    return row?.communityId === communityId;
+}
 
 export async function groupRoutes(app: FastifyInstance) {
     // get /chat/group/:communityId
     // get or auto-create the group thread for a commnity block
     // every coomunity has exactly one group thread - created lazily on first access
-    app.get('/chat/group/:commnityId', { preHandler: requireAuth }, async (request, reply) => {
-        const user = request.user as { sub: string; communityId: string | null }
+    app.get('/chat/group/:communityId', { preHandler: requireAuth }, async (request, reply) => {
+        const user = request.user as { sub: string }
         const { communityId } = request.params as { communityId: string }
 
-        // users can only access their own community's group chat
-        if (user.communityId !== communityId) {
+        if (!(await userBelongsToCommunity(user.sub, communityId))) {
             return reply.status(403).send({ error: 'You are not in this community' })
         }
 
@@ -58,10 +66,10 @@ export async function groupRoutes(app: FastifyInstance) {
             return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten().fieldErrors })
         }
 
-        const sender = request.user as { sub: string; communityId: string | null }
+        const sender = request.user as { sub: string }
         const { communityId } = request.params as { communityId: string }
 
-        if (sender.communityId !== communityId) {
+        if (!(await userBelongsToCommunity(sender.sub, communityId))) {
             return reply.status(403).send({ error: 'You are not in this community' })
         }
 
@@ -78,6 +86,14 @@ export async function groupRoutes(app: FastifyInstance) {
                 threadId: thread.id,
                 senderId: sender.sub,
                 body: parsed.data.body
+            },
+            include: {
+                sender: {
+                    select: {
+                        id: true,
+                        displayName: true,
+                    }
+                }
             }
         })
 
@@ -89,6 +105,7 @@ export async function groupRoutes(app: FastifyInstance) {
             messageId: message.id,
             threadId: thread.id,
             senderId: sender.sub,
+            senderName: message.sender.displayName,
             communityId,
             body: message.body,
             createdAt: message.createdAt.toISOString(),
@@ -100,20 +117,30 @@ export async function groupRoutes(app: FastifyInstance) {
     // GET /chat/group/:communityId/messages
     // paginated group message history
     app.get('/chat/group/:communityId/messages', { preHandler: requireAuth }, async (request, reply) => {
-        const user = request.user as { sub: string; communityId: string | null }
+        const user = request.user as { sub: string }
         const { communityId } = request.params as { communityId: string }
 
-        if (user.communityId !== communityId) {
+        if (!(await userBelongsToCommunity(user.sub, communityId))) {
             return reply.status(403).send({ error: 'You are not in this community' })
         }
 
-        const thread = await prisma.chatThread.findFirst({
+        let thread = await prisma.chatThread.findFirst({
             where: { type: 'group', communityId },
         })
 
         if (!thread) {
-            return reply.send({ messages: [], nextCursor: null })
+            thread = await prisma.chatThread.create({
+                data: { type: 'group', communityId },
+            })
         }
+
+        await prisma.chatParticipant.upsert({
+            where: {
+                threadId_userId: { threadId: thread.id, userId: user.sub },
+            },
+            create: { threadId: thread.id, userId: user.sub },
+            update: {},
+        })
 
         const query = request.query as { cursor?: string; limit?: string }
         const limit = Math.min(parseInt(query.limit ?? '30', 10), 100)
@@ -127,7 +154,12 @@ export async function groupRoutes(app: FastifyInstance) {
             orderBy: { createdAt: 'desc' },
             take: limit,
             include: {
-                // include sender info so frontend can show display names
+                sender: {          
+                    select: {
+                        id: true,
+                        displayName: true,
+                    },
+                },
             },
         })
 

@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -30,14 +31,21 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 	// in production: validate origin header against allowed domains
 	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+        origin := r.Header.Get("Origin")
+        allowed := os.Getenv("FRONTEND_URL")
+        if allowed == "" {
+            allowed = "http://localhost:3000"
+        }
+        return origin == allowed
+    },
+
 }
 
 // first message the client must send after connecting
 type AuthMessage struct {
-	Type  string `json:"type"` // must be "auth"
-	Token string `json:"token"`
+	Type        string `json:"type"` // must be "auth"
+	Token       string `json:"token"`
+	CommunityID string `json:"communityId,omitempty"` // fallback when JWT is stale
 }
 
 const (
@@ -78,8 +86,18 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	communityID := ""
-	if claims.CommunityID != nil {
+	if claims.CommunityID != nil && *claims.CommunityID != "" {
 		communityID = *claims.CommunityID
+	} else if authMsg.CommunityID != "" {
+		communityID = authMsg.CommunityID
+	}
+
+	ctx := context.Background()
+	if communityID == "" {
+		cached, err := redisclient.Client.Get(ctx, "user:"+claims.Sub+":community").Result()
+		if err == nil && cached != "" {
+			communityID = cached
+		}
 	}
 
 	// step 2 : register
@@ -93,19 +111,19 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 	hub.Global.Register(client)
 	log.Printf("[WS] client registered: userID=%s, communityID=%s", client.UserID, client.CommunityID)
 
-	// step 3 : recoerd presence in redis
-	ctx := context.Background()
+	// step 3 : record presence in redis (only when user belongs to a community)
 	presenceKey := fmt.Sprintf("presence:%s", communityID)
-	
-	redisclient.Client.HSet(ctx, presenceKey, client.UserID, time.Now().Unix())
-	redisclient.Client.Expire(ctx, presenceKey, 90*time.Second) // ttl refreshed by heartbeat
+	if communityID != "" {
+		redisclient.Client.HSet(ctx, presenceKey, client.UserID, time.Now().Unix())
+		redisclient.Client.Expire(ctx, presenceKey, 90*time.Second)
+	}
 
 	// step 4 : subscribe to redis pub/sub
-	// one pubsub connection per user - sibscriber to personal + community channels
-	pubsub := redisclient.Client.Subscribe(ctx, 
-		fmt.Sprintf("ws:user:%s", client.UserID),
-		fmt.Sprintf("ws:community:%s", communityID),
-	)
+	channels := []string{fmt.Sprintf("ws:user:%s", client.UserID)}
+	if communityID != "" {
+		channels = append(channels, fmt.Sprintf("ws:community:%s", communityID))
+	}
+	pubsub := redisclient.Client.Subscribe(ctx, channels...)
 
 	// step 5 : spawn go routines
 	// reader & write run concurrently - go routines make this trivial
@@ -114,7 +132,9 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 
 	// cleanup runs when reader returns (client disconnected)
 	hub.Global.Unregister(client.UserID)
-	redisclient.Client.HDel(ctx, presenceKey, client.UserID)
+	if communityID != "" {
+		redisclient.Client.HDel(ctx, presenceKey, client.UserID)
+	}
 	pubsub.Close()
 
 	log.Printf("[WS] client disconnected: userID=%s, communityID=%s", client.UserID, client.CommunityID)
@@ -123,7 +143,7 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 // reader - runs in the handler goroutine
-// reads client messages (ping, keepalives) and detects disconnect
+// reads client messages (ping, keepalives, typing, presence) and detects disconnect
 func reader(client *hub.Client, ctx context.Context, pubsub *goredis.PubSub) {
 	defer client.Conn.Close()
 
@@ -135,19 +155,60 @@ func reader(client *hub.Client, ctx context.Context, pubsub *goredis.PubSub) {
 	})
 
 	for {
-		_, _, err := client.Conn.ReadMessage()
+		_, msgBytes, err := client.Conn.ReadMessage()
 		if err != nil {
-			// websocket.IsUnexpectedCloseError catches app closeed and network dropped
+			// websocket.IsUnexpectedCloseError catches app closed and network dropped
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 				log.Printf("[WS] unexpected close for user=%s: %v", client.UserID, err)
 			}
 			return
 		}
+
+		var msg struct {
+			Type        string `json:"type"`
+			RecipientID string `json:"recipientId"`
+			IsTyping    bool   `json:"isTyping"`
+		}
+
+		if err := json.Unmarshal(msgBytes, &msg); err != nil {
+			continue
+		}
+
+		if msg.Type == "typing" {
+			event := map[string]interface{}{
+				"type":        "user_typing",
+				"senderId":    client.UserID,
+				"recipientId": msg.RecipientID,
+				"isTyping":    msg.IsTyping,
+			}
+			eventBytes, _ := json.Marshal(event)
+			redisclient.Client.Publish(ctx, fmt.Sprintf("ws:user:%s", msg.RecipientID), eventBytes)
+		} else if msg.Type == "presence_check" {
+			keys, err := redisclient.Client.Keys(ctx, "presence:*").Result()
+			isOnline := false
+			if err == nil {
+				for _, key := range keys {
+					exists, err := redisclient.Client.HExists(ctx, key, msg.RecipientID).Result()
+					if err == nil && exists {
+						isOnline = true
+						break
+					}
+				}
+			}
+			response := map[string]interface{}{
+				"type":   "presence_response",
+				"userId": msg.RecipientID,
+				"online": isOnline,
+			}
+			respBytes, _ := json.Marshal(response)
+			select {
+			case client.Send <- respBytes:
+			default:
+				log.Printf("[WS] Send channel full for user=%s", client.UserID)
+			}
+		}
 	}
-	
 }
-
-
 
 // writer - runs in its own goroutine
 // forwards redis pub/sub messages and gateway pings to the socket
@@ -170,11 +231,16 @@ func writer(client *hub.Client, pubsub *goredis.PubSub) {
 				return   // write failed — client likely disconnected
 			}
 
-		case _, ok := <-client.Send:
-			// direct messages from Hub (not used heavily yet, reserved for server-initiated msgs)
+		case data, ok := <-client.Send:
+			// direct messages from Hub (including presence responses)
 			if !ok {
 				// Hub closed the channel — unregister was called
 				client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := client.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				return
 			}
 

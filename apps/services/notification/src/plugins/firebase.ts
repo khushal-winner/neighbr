@@ -46,7 +46,7 @@ export async function sendMulticast(
     },
     apns: {
       payload: {
-        app: { sound: "default", badge: 1 },
+        aps: { sound: "default", badge: 1 },
       },
     },
   };

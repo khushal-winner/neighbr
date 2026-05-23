@@ -14,7 +14,10 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^10.0.0",
     "amqplib": "^2.0.1",
+    "cloudinary": "^2.10.0",
     "kafkajs": "^2.2.4"
   }
 }

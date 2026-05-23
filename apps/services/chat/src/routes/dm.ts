@@ -41,35 +41,35 @@ export async function dmRoutes(app: FastifyInstance) {
             return reply.status(400).send({ error: 'Cannot message unverified user' })
         }
 
-        // find existing thread between these two users
-        // a DM thread has exactly two participants - look for one that has both
-        const exisiting = await prisma.chatThread.findFirst({
+        // find existing 1:1 DM (both users must be participants, exactly two total)
+        const candidates = await prisma.chatThread.findMany({
             where: {
                 type: 'dm',
-                participants: {
-                    every: {
-                        userId: {
-                            in: [sender.sub, recipientId]
-                        },
-                    },
-                    some: {
-                        userId: sender.sub
-                    },
-                }
+                AND: [
+                    { participants: { some: { userId: sender.sub } } },
+                    { participants: { some: { userId: recipientId } } },
+                ],
             },
             include: {
-                participants: {
-                    select: { userId: true },
-                }
-            }
+                participants: { select: { userId: true } },
+            },
         })
 
-
-        // if both users are in the same thread its the DM thread
-        const existingDM = exisiting?.participants.length === 2 ? exisiting : null
+        const existingDM =
+            candidates.find(
+                (t) =>
+                    t.participants.length === 2 &&
+                    t.participants.every(
+                        (p) =>
+                            p.userId === sender.sub || p.userId === recipientId,
+                    ),
+            ) ?? null
 
         if (existingDM) {
-            return reply.status(200).send({ threadId: existingDM.id })
+            return reply.status(200).send({
+                threadId: existingDM.id,
+                thread: existingDM,
+            })
         }
 
         // no thread yet - create one with both pariticipants
@@ -148,7 +148,7 @@ export async function dmRoutes(app: FastifyInstance) {
         const redis = getRedis()
 
         const payload = JSON.stringify({
-            type: 'chat-message',
+            type: 'chat_message',
             messageId: message.id,
             threadId,
             senderId: sender.sub,
@@ -209,7 +209,27 @@ export async function dmRoutes(app: FastifyInstance) {
 
         const nextCursor = messages.length === limit ? messages[messages.length - 1].createdAt.toISOString() : null
 
-        return reply.send({ messages, nextCursor })
+        // find recipient
+        const recipientParticipation = await prisma.chatParticipant.findFirst({
+            where: {
+                threadId,
+                userId: { not: sender.sub }
+            }
+        })
+        let recipientName = 'Neighbour'
+        let recipientId: string | null = null
+        if (recipientParticipation) {
+            recipientId = recipientParticipation.userId
+            const recipientUser = await prisma.user.findUnique({
+                where: { id: recipientParticipation.userId },
+                select: { displayName: true }
+            })
+            if (recipientUser) {
+                recipientName = recipientUser.displayName
+            }
+        }
+
+        return reply.send({ messages, nextCursor, recipientName, recipientId })
     })
 
     // patch /chat/dm/:threadId/read
@@ -260,14 +280,7 @@ export async function dmRoutes(app: FastifyInstance) {
                 }
             },
             include: {
-                participants: {
-                    where: {
-                        userId: { not: user.sub },
-                    },
-                    include: {
-                        // we only need the display name of the other person
-                    }
-                },
+                participants: true,
                 messages: {
                     orderBy: { createdAt: 'desc' },
                     take: 1, // last message preview
@@ -280,6 +293,65 @@ export async function dmRoutes(app: FastifyInstance) {
             }
         })
 
-        return reply.send({ threads })
+        // Fetch other users' displayNames
+        const otherUserIds = threads.map(t => {
+            const other = t.participants.find(p => p.userId !== user.sub)
+            return other?.userId
+        }).filter((id): id is string => !!id)
+
+        const users = await prisma.user.findMany({
+            where: { id: { in: otherUserIds } },
+            select: { id: true, displayName: true }
+        })
+        const userMap = new Map(users.map(u => [u.id, u.displayName]))
+
+        const threadsWithNames = threads
+            .map((t) => {
+                const other = t.participants.find((p) => p.userId !== user.sub)
+                const otherName = other
+                    ? (userMap.get(other.userId) ?? 'Neighbour')
+                    : 'Neighbour'
+                return {
+                    ...t,
+                    recipientId: other?.userId,
+                    recipientName: otherName,
+                }
+            })
+            .sort((a, b) => {
+                const aTime = a.messages[0]?.createdAt ?? a.createdAt
+                const bTime = b.messages[0]?.createdAt ?? b.createdAt
+                return new Date(bTime).getTime() - new Date(aTime).getTime()
+            })
+
+        // one conversation per neighbour — keep the thread with latest activity
+        const byOtherUser = new Map<string, (typeof threadsWithNames)[number]>()
+        for (const thread of threadsWithNames) {
+            const otherId = thread.recipientId
+            if (!otherId) continue
+
+            const existing = byOtherUser.get(otherId)
+            if (!existing) {
+                byOtherUser.set(otherId, thread)
+                continue
+            }
+
+            const threadTime = new Date(
+                thread.messages[0]?.createdAt ?? thread.createdAt,
+            ).getTime()
+            const existingTime = new Date(
+                existing.messages[0]?.createdAt ?? existing.createdAt,
+            ).getTime()
+            if (threadTime > existingTime) {
+                byOtherUser.set(otherId, thread)
+            }
+        }
+
+        const dedupedThreads = Array.from(byOtherUser.values()).sort((a, b) => {
+            const aTime = a.messages[0]?.createdAt ?? a.createdAt
+            const bTime = b.messages[0]?.createdAt ?? b.createdAt
+            return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+
+        return reply.send({ threads: dedupedThreads })
     })
 }

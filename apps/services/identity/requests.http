@@ -77,7 +77,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "ghost@example.com",
+  "email": "testuser@example.com",
   "password": "password123"
 }
 
@@ -87,7 +87,7 @@ Content-Type: application/json
 ### paste your accessToken from login response below
 ### ───────────────────────────────
 
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOWJjMzA1Yi1mNDM0LTRlZjUtYmQ5Ny1iMWU2MTNiNWEwYjMiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOiJhMWIyYzNkNC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJ2ZXJpZmljYXRpb25MZXZlbCI6InBvc3RjYXJkX3ZlcmlmaWVkIiwiaWF0IjoxNzc4OTQ1Nzg1LCJleHAiOjE3Nzg5NDY2ODV9.K-f1JXdVhVXA6I8R3rocwqmFtOsupCQpfP3YAqDXFHc
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5NGM1ZjU2ZC1kMGY5LTRiMjktOTBlZC1iMTI2NjExY2ZjNzQiLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiY29tbXVuaXR5SWQiOm51bGwsInZlcmlmaWNhdGlvbkxldmVsIjoidW52ZXJpZmllZCIsImlhdCI6MTc3OTM4NjEzNCwiZXhwIjoxNzc5Mzg3MDM0fQ.v_6lMCOV2dliGypt6W9tfF8wvk68i4rySaDH869oa4w
 
 ### 8. Get current user — valid token
 GET {{baseUrl}}/auth/me

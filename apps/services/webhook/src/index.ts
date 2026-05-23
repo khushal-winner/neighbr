@@ -2,26 +2,38 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import { webhookRoutes } from './routes/webhook'
 
-export function buildApp() {
-    const app = Fastify({ logger: false })
+const app = Fastify({ logger: true })
 
-    app.get('/health', async () => ({ status: 'ok', service: 'webhook' }))
+// CORS configuration
+app.register(cors, {
+  origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  credentials: false,
+  methods: ['GET', 'POST', 'OPTIONS'],
+})
 
-    app.register(webhookRoutes)
+// Register webhook routes
+app.register(webhookRoutes)
 
-    return app
+// Health check
+app.get('/health', async () => ({
+  status: 'ok',
+  service: 'webhook',
+}))
+
+const start = async () => {
+  try {
+    await app.listen({
+      port: Number(process.env.PORT) || 3008,
+      host: '0.0.0.0',
+    })
+    console.log('[Webhook] Running on port', process.env.PORT || 3008)
+  } catch (error) {
+    console.error('[Webhook] Fatal:', error)
+    process.exit(1)
+  }
 }
 
-if (require.main === module) {
-    const app = buildApp()
-    const port = parseInt(process.env.PORT ?? '3006', 10)
-
-    app.listen({ port, host: '0.0.0.0' })
-        .then(() => console.log(`[Webhook] Running on port ${port}`))
-        .catch((err) => {
-            console.error('[Webhook] Fatal:', err)
-            process.exit(1)
-        })
-}
+start()

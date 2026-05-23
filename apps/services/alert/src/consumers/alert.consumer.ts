@@ -4,6 +4,7 @@ dotenv.config();
 import { Kafka, logLevel } from "kafkajs";
 import { getRedis } from "../plugins/redis";
 import prisma from "../plugins/prisma";
+import console from "console";
 
 interface AlertEvent {
   postId: string;
@@ -29,7 +30,7 @@ async function fanOutAlert(event: AlertEvent): Promise<void> {
   // find all users whose home location is within radius of the alert's origin
   // we use the author's stored coordinates as the alert's epicentre
   // ST_DWithin with geography type uses metres — no unit conversion needed
-  const affectedUsers = await prisma.$queryRaw<{ id: string }[]>`
+  let affectedUsers = await prisma.$queryRaw<{ id: string }[]>`
     SELECT u.id
     FROM "User" u
     JOIN "User" author ON author.id = ${event.authorId}
@@ -45,6 +46,19 @@ async function fanOutAlert(event: AlertEvent): Promise<void> {
   `;
 
   console.log(`[Alert] ${affectedUsers.length} users in radius`);
+
+  // fallback: if no users have coordinates, broadcast to entire community
+  if (affectedUsers.length === 0) {
+    console.log(`[Alert] No users with coordinates, falling back to community broadcast`);
+    affectedUsers = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "User"
+      WHERE
+        "communityId" = ${event.communityId}
+        AND id != ${event.authorId}
+    `;
+    console.log(`[Alert] ${affectedUsers.length} users in community`);
+  }
 
   if (affectedUsers.length === 0) return;
 
@@ -76,8 +90,7 @@ async function fanOutAlert(event: AlertEvent): Promise<void> {
   pipeline.xadd(
     alertStreamKey(event.communityId),
     "*",
-    "payload",
-    alertPayload,
+    { payload: alertPayload }
   );
 
   await pipeline.exec();
@@ -100,29 +113,34 @@ export async function startAlertConsumer(): Promise<void> {
 
   const consumer = kafka.consumer({ groupId: "alert-fanout-group" });
 
-  await consumer.connect();
+  try {
+    await consumer.connect();
 
-  // subscribe to city-scoped alert topics
-  // in production you'd subscribe to a pattern or enumerate all city topics
-  // for dev, subscribe to the topic you created in Redpanda
-  await consumer.subscribe({ topic: "alerts.delhi", fromBeginning: false });
+    // subscribe to city-scoped alert topics
+    // in production you'd subscribe to a pattern or enumerate all city topics
+    // for dev, subscribe to the topic you created in Redpanda
+    await consumer.subscribe({ topic: "alerts.delhi", fromBeginning: false });
 
-  console.log("[Alert] Kafka consumer connected, listening on alerts.delhi");
+    console.log("[Alert] Kafka consumer connected, listening on alerts.delhi");
 
-  await consumer.run({
-    eachMessage: async ({ message }) => {
-      if (!message.value) return;
+    await consumer.run({
+      eachMessage: async ({ message }) => {
+        if (!message.value) return;
 
-      try {
-        const event: AlertEvent = JSON.parse(message.value.toString());
-        await fanOutAlert(event);
-      } catch (err) {
-        console.error("[Alert] Fan-out failed:", err);
-        // don't rethrow — a failed fan-out shouldn't stop the consumer
-        // in production you'd publish to a dead-letter topic here
-      }
-    },
-  });
+        try {
+          const event: AlertEvent = JSON.parse(message.value.toString());
+          await fanOutAlert(event);
+        } catch (err) {
+          console.error("[Alert] Fan-out failed:", err);
+          // don't rethrow — a failed fan-out shouldn't stop the consumer
+          // in production you'd publish to a dead-letter topic here
+        }
+      },
+    });
+  } catch (err) {
+    console.warn(`[Alert] Kafka connection/subscription failed (possibly topic authorization issue):`, err);
+    console.warn(`[Alert] Alert service remains active, but background Kafka alert broadcasts will be skipped until Kafka topics are configured.`);
+  }
 
   process.on("SIGTERM", async () => {
     await consumer.disconnect();

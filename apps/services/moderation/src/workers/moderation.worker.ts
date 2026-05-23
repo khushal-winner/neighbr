@@ -50,12 +50,26 @@ async function processJob(job: ModerationJob): Promise<void> {
     // this is service-to-service on internal network - no auth header needed 
     const postServiceUrl = process.env.POST_SERVICE_URL ?? 'http://localhost:3002'
 
+    // CRITICAL PATH — patch the post status via HTTP
+    // If this fails (e.g. 404), we either skip or retry the whole job
     try {
         await axios.patch(`${postServiceUrl}/posts/${job.postId}/status`, {
             status: decision,
         })
+    } catch (error: any) {
+        if (error.response?.status === 404) {
+            console.log(`[Moderation] Post ${job.postId} not found, skipping update`)
+            return // Don't retry - the post doesn't exist
+        }
+        throw error // Re-throw other errors to trigger retry
+    }
 
-        if (decision === 'approved') {
+    // NON-CRITICAL — Kafka event publishing is fire-and-forget
+    // If the broker is unreachable or topics don't exist yet, log and move on.
+    // Downstream consumers (feed, trust, notifications) will miss this event
+    // but the post is already approved/flagged in the database.
+    if (decision === 'approved') {
+        try {
             const producer = await getKafkaProducer()
             await producer.send({
                 topic: 'post.created',
@@ -63,14 +77,18 @@ async function processJob(job: ModerationJob): Promise<void> {
                     key: job.postId,
                     value: JSON.stringify({
                         postId: job.postId,
-                        communityId: job.communityId,  // you'll need to add this to ModerationJob
-                        type: job.type,
+                        communityId: job.communityId,
+                        type: job.text.split('\n')[0],
                         createdAt: new Date().toISOString(),
                     })
                 }]
             })
+        } catch (kafkaErr) {
+            console.warn(`[Moderation] Kafka post.created publish failed (non-fatal):`, (kafkaErr as Error).message)
         }
+    }
 
+    try {
         const producer = await getKafkaProducer()
         await producer.send({
             topic: 'user.events',
@@ -83,12 +101,8 @@ async function processJob(job: ModerationJob): Promise<void> {
                 })
             }]
         })
-    } catch (error: any) {
-        if (error.response?.status === 404) {
-            console.log(`[Moderation] Post ${job.postId} not found, skipping update`)
-            return // Don't retry - the post doesn't exist
-        }
-        throw error // Re-throw other errors to trigger retry
+    } catch (kafkaErr) {
+        console.warn(`[Moderation] Kafka user.events publish failed (non-fatal):`, (kafkaErr as Error).message)
     }
 
     console.log(`[Moderation] Post ${job.postId} → ${decision} (score : ${maxScore.toFixed(2)})`)

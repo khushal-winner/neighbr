@@ -7,7 +7,7 @@ let producer: Producer | null = null
 export async function getKafkaProducer(): Promise<Producer> {
     if (!producer) {
         const kafka = new Kafka({
-            clientId: 'post-service',
+            clientId: 'identity-service',
             brokers: [process.env.KAFKA_BROKER as string],
             ssl: true,
             sasl: {
@@ -20,7 +20,7 @@ export async function getKafkaProducer(): Promise<Producer> {
 
         producer = kafka.producer()
         await producer.connect()
-        console.log('[Post] kafka producer connected')
+        console.log('[Identity] Kafka producer connected')
     }
     return producer
 }
