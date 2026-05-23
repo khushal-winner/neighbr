@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "build:deploy-api": "turbo run build --filter=@neighbr/deploy-api...",
-    "build:deploy-workers": "turbo run build --filter=@neighbr/deploy-workers...",
+    "build:deploy-api": "npx --yes turbo@2.9.14 run build --filter=@neighbr/deploy-api...",
+    "build:deploy-workers": "npx --yes turbo@2.9.14 run build --filter=@neighbr/deploy-workers...",
     "build:backend": "turbo run build --filter=./apps/services/* --filter=@neighbr/db --filter=@neighbr/config --concurrency=4",
     "build:gateway": "npm run build --workspace=@neighbr/gateway",
     "build:web": "turbo run build --filter=web",

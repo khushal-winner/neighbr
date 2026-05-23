@@ -10,7 +10,7 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: npm ci && npm run build:deploy-api
+    buildCommand: npm ci --include=dev && npm run build:deploy-api
     startCommand: node apps/deploy/api/dist/index.js
     healthCheckPath: /health
     envVars:
@@ -64,7 +64,7 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: npm ci && npm run build:deploy-workers
+    buildCommand: npm ci --include=dev && npm run build:deploy-workers
     startCommand: node apps/deploy/workers/dist/index.js
     envVars:
       - key: NODE_ENV
