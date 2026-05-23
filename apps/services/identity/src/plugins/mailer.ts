@@ -1,30 +1,34 @@
 /**
- * Send the 6-digit postcard verification code to the user's email via Resend API.
+ * Send the 6-digit postcard verification code to the user's email via Brevo API.
  * Uses HTTP API instead of SMTP to avoid Render's network restrictions.
  */
 export async function sendVerificationEmail(
   to: string,
   code: string,
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
 
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY must be set");
+    throw new Error("BREVO_API_KEY must be set");
   }
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "api-key": apiKey,
         "Content-Type": "application/json",
+        "accept": "application/json",
       },
       body: JSON.stringify({
-        from: "onboarding@resend.dev",
-        to,
+        sender: {
+          name: "Neighbr",
+          email: "thunderbolt8663@gmail.com",
+        },
+        to: [{ email: to }],
         subject: "Your Neighbr verification code",
-        text: `Your verification code is: ${code}\n\nEnter this code in the app to complete your identity verification.\n\nThis code expires in 7 days.`,
-        html: `
+        textContent: `Your verification code is: ${code}\n\nEnter this code in the app to complete your identity verification.\n\nThis code expires in 7 days.`,
+        htmlContent: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
             <div style="text-align: center; margin-bottom: 32px;">
               <span style="font-size: 48px;">🏘️</span>
@@ -42,7 +46,7 @@ export async function sendVerificationEmail(
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Resend API failed: ${response.status} ${error}`);
+      throw new Error(`Brevo API failed: ${response.status} ${error}`);
     }
 
     console.log("[mailer] Verification email sent to", to);
