@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv'
 dotenv.config()
 
+import type { Prisma } from '@neighbr/db'
 import { Kafka, logLevel } from 'kafkajs'
 import prisma from '../plugins/prisma'
 import { getRedis } from '../plugins/redis'
@@ -39,7 +40,7 @@ async function processEvent(event: UserEvent): Promise<void> {
 
     // atomic update - increment score and write audit event in a transaction
     // transaction ensures the score and the audit trail never diverge
-    const updatedUser = await prisma.$transaction(async (tx) => {
+    const updatedUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
 
         // write the audit event first - if anything fails, both roll back
         await tx.trustScoreEvent.create({

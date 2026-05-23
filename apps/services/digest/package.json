@@ -13,6 +13,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@neighbr/db": "*",
     "@prisma/client": "^7.8.0",
     "bullmq": "^5.76.10",
     "dotenv": "^17.4.2",
