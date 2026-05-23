@@ -88,7 +88,8 @@ export default function ChatPage() {
             // use existing token
         }
 
-        const communityId = useAuthStore.getState().user?.communityId ?? user.communityId
+        const communityId =
+            useAuthStore.getState().user?.communityId ?? user?.communityId
         if (!communityId) {
             setLoadingMembers(false)
             return
@@ -283,7 +284,7 @@ export default function ChatPage() {
                         ) : (
                             <CommunityMembersList
                                 members={membersWithoutExistingChat}
-                                currentUserId={user.id}
+                                currentUserId={user?.id ?? ''}
                                 onStartDm={startDm}
                             />
                         )}

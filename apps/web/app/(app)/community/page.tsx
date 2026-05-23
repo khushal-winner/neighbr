@@ -57,7 +57,8 @@ export default function CommunityPage() {
     const { subscribe, isConnected } = useWebSocket()
 
     useEffect(() => {
-        if (!user?.communityId) return
+        const communityIdFromUser = user?.communityId
+        if (!communityIdFromUser) return
 
         let cancelled = false
 
@@ -70,7 +71,8 @@ export default function CommunityPage() {
                 // continue with existing session
             }
 
-            const communityId = useAuthStore.getState().user?.communityId ?? user.communityId
+            const communityId =
+                useAuthStore.getState().user?.communityId ?? communityIdFromUser
             if (!communityId || cancelled) return
 
             const cached = loadGroupChatCache(communityId)
@@ -95,7 +97,7 @@ export default function CommunityPage() {
 
             const data = commR.value.data.community
             setCommunity(data)
-            setIsCaptain(data.blockCaptain?.id === user.id)
+            setIsCaptain(data.blockCaptain?.id === user?.id)
 
             if (membersR.status === 'fulfilled') {
                 setOnlineUsers(membersR.value.data.onlineUsers ?? [])
@@ -126,10 +128,11 @@ export default function CommunityPage() {
 
     // Real-time incoming group messages
     useEffect(() => {
-        if (!user?.communityId) return
+        const communityIdFromUser = user?.communityId
+        if (!communityIdFromUser) return
 
         const unsub = subscribe('group_message', (data) => {
-            if (data.communityId !== user.communityId) return
+            if (data.communityId !== communityIdFromUser) return
 
             setMessages(prev => {
                 const exists = prev.some(m => m.id === data.messageId)
@@ -141,7 +144,7 @@ export default function CommunityPage() {
                     body: data.body as string,
                     createdAt: data.createdAt as string,
                 }]
-                saveGroupChatCache(user.communityId!, next)
+                saveGroupChatCache(communityIdFromUser, next)
                 return next
             })
         })
@@ -155,18 +158,19 @@ export default function CommunityPage() {
 
     async function sendChatMessage(e: React.FormEvent) {
         e.preventDefault()
-        if (!chatInput.trim() || chatSending || !user?.communityId) return
+        const communityId = user?.communityId
+        if (!chatInput.trim() || chatSending || !communityId) return
 
         setChatSending(true)
         const body = chatInput.trim()
         setChatInput('')
 
         try {
-            const res = await chatApi.post(`/chat/group/${user.communityId}/message`, { body })
+            const res = await chatApi.post(`/chat/group/${communityId}/message`, { body })
             setMessages(prev => {
                 const exists = prev.some(m => m.id === res.data.message.id)
                 const next = exists ? prev : [...prev, res.data.message]
-                if (user?.communityId) saveGroupChatCache(user.communityId, next)
+                saveGroupChatCache(communityId, next)
                 return next
             })
         } catch {
