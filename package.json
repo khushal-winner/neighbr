@@ -5,6 +5,8 @@
     "build": "turbo run build",
     "build:deploy-api": "npx --yes turbo@2.9.14 run build --filter=@neighbr/deploy-api...",
     "build:deploy-workers": "npx --yes turbo@2.9.14 run build --filter=@neighbr/deploy-workers...",
+    "build:deploy-all": "npx --yes turbo@2.9.14 run build --filter=@neighbr/deploy-all... && node apps/deploy/all/scripts/build-gateway.mjs",
+    "build:gateway-bin": "node apps/deploy/all/scripts/build-gateway.mjs",
     "build:backend": "turbo run build --filter=./apps/services/* --filter=@neighbr/db --filter=@neighbr/config --concurrency=4",
     "build:gateway": "npm run build --workspace=@neighbr/gateway",
     "build:web": "turbo run build --filter=web",

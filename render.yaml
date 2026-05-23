@@ -1,21 +1,18 @@
-# Render Blueprint — Neighbr combined API + background workers
-# Docs: https://render.com/docs/blueprint-spec
-#
-# Before deploy: set secret env vars in the Render dashboard (or link env groups).
-# Required: DATABASE_URL, JWT_SECRET, COOKIE_SECRET, REDIS_URL, KAFKA_*, etc.
-
+# Single Render web service: API + workers + WebSocket gateway (/ws proxied)
 services:
   - type: web
-    name: neighbr-api
+    name: neighbr
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: npm ci --include=dev && npm run build:deploy-api
-    startCommand: node apps/deploy/api/dist/index.js
+    buildCommand: npm ci --include=dev && npm run build:deploy-all
+    startCommand: node apps/deploy/all/dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: GATEWAY_PORT
+        value: "8080"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
@@ -57,42 +54,6 @@ services:
       - key: SMTP_PORT
         sync: false
       - key: SMTP_FROM
-        sync: false
-
-  - type: worker
-    name: neighbr-workers
-    runtime: node
-    plan: starter
-    region: oregon
-    buildCommand: npm ci --include=dev && npm run build:deploy-workers
-    startCommand: node apps/deploy/workers/dist/index.js
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: UPSTASH_REDIS_REST_URL
-        sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
-        sync: false
-      - key: KAFKA_BROKER
-        sync: false
-      - key: KAFKA_USERNAME
-        sync: false
-      - key: KAFKA_PASSWORD
-        sync: false
-      - key: RABBITMQ_URL
-        sync: false
-      - key: POST_SERVICE_URL
-        fromService:
-          name: neighbr-api
-          type: web
-          property: hostport
-      - key: INTERNAL_SECRET
         sync: false
       - key: RESEND_API_KEY
         sync: false

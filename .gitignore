@@ -14,6 +14,7 @@ build/
 .env.production
 **/.env
 !**/.env.example
+apps/deploy/all/bin/
 
 # Prisma generated client
 **/generated/

@@ -1,60 +1,70 @@
-# Deploy Neighbr API + workers on Render
+# Deploy Neighbr on Render (single service)
 
-Combined HTTP (`neighbr-api`) and background jobs (`neighbr-workers`) for production. Use Neon, Upstash, Kafka, and CloudAMQP for data (not Render Postgres).
+One Render **Web Service** runs everything:
+
+- HTTP API (identity, post, feed, chat, community, webhook, moderation admin)
+- Background workers (feed, alert, trust, notification, moderation, digest)
+- Go WebSocket gateway (internal `GATEWAY_PORT`, public path `/ws`)
+
+Use external managed services: **Neon** (Postgres), **Upstash** (Redis), **Redpanda** (Kafka), **CloudAMQP** (RabbitMQ). Frontend stays on **Vercel**.
 
 ## Local build
 
-```bash
-npm install
-npm run build:deploy-api
-npm run build:deploy-workers
-```
-
-Run (requires `.env` with secrets):
+Requires **Node 20+** and **Go** (for the gateway binary).
 
 ```bash
-node apps/deploy/api/dist/index.js
-node apps/deploy/workers/dist/index.js
+npm ci --include=dev
+npm run build:deploy-all
 ```
 
-## Render deploy (short)
+`build:deploy-all` compiles 13 workspace packages + `apps/deploy/all/bin/gateway` (or `gateway.exe` on Windows).
 
-1. Push repo to GitHub.
-2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → connect repo (uses root `render.yaml`).
-3. Set **secret** env vars when prompted (`DATABASE_URL`, `JWT_SECRET`, `COOKIE_SECRET`, `KAFKA_*`, `REDIS_URL`, etc.).
-4. Wait for **neighbr-api** (Web) and **neighbr-workers** (Background Worker) to deploy.
-5. Open `https://<neighbr-api>.onrender.com/health` → should return `{"status":"ok","service":"neighbr-api"}`.
-6. Point frontend (Vercel) env to one API URL:
+If `NODE_ENV=production` locally, devDependencies (TypeScript, `@types/*`) are skipped — use `npm ci --include=dev` before building.
 
-   ```
-   NEXT_PUBLIC_IDENTITY_URL=https://<neighbr-api>.onrender.com
-   NEXT_PUBLIC_POST_URL=https://<neighbr-api>.onrender.com
-   NEXT_PUBLIC_FEED_URL=https://<neighbr-api>.onrender.com
-   NEXT_PUBLIC_CHAT_URL=https://<neighbr-api>.onrender.com
-   NEXT_PUBLIC_COMMUNITY_URL=https://<neighbr-api>.onrender.com
-   ```
+Run (copy `apps/deploy/all/.env.example` → `apps/deploy/all/.env` and fill secrets):
 
-7. Deploy Go gateway on Fly (WebSockets) separately; set `NEXT_PUBLIC_WS_URL`.
+```bash
+node apps/deploy/all/dist/index.js
+```
 
-## Manual services (no Blueprint)
+Health: `http://localhost:10000/health` → `{ "status": "ok", "service": "neighbr-all", "gateway": true, ... }`
 
-**Web service `neighbr-api`**
+## Render dashboard (existing `neighbr` service)
 
 | Field | Value |
 |-------|--------|
 | Root Directory | *(repo root)* |
-| Build Command | `npm ci && npm run build:deploy-api` |
-| Start Command | `node apps/deploy/api/dist/index.js` |
-| Health Check | `/health` |
+| Build Command | `npm ci --include=dev && npm run build:deploy-all` |
+| Start Command | `node apps/deploy/all/dist/index.js` |
+| Health Check Path | `/health` |
+| `NODE_ENV` | `production` |
+| `GATEWAY_PORT` | `8080` (internal only) |
 
-**Background Worker `neighbr-workers`**
+**If the Node build fails** (no Go on Render’s native runtime), switch the service to **Docker** and set Dockerfile path to `apps/deploy/all/Dockerfile`.
 
-| Field | Value |
-|-------|--------|
-| Build Command | `npm ci && npm run build:deploy-workers` |
-| Start Command | `node apps/deploy/workers/dist/index.js` |
-| `POST_SERVICE_URL` | `https://<neighbr-api>.onrender.com` (or use Blueprint `fromService`) |
+Env vars: merge `apps/deploy/api/.env` + worker secrets — see `apps/deploy/all/.env.example`. Set `FRONTEND_URL` to your Vercel URL. `POST_SERVICE_URL` is optional (defaults to `http://127.0.0.1:$PORT`).
+
+Your service URL example: `https://neighbr-20tx.onrender.com`
+
+## Vercel frontend (one host)
+
+```
+NEXT_PUBLIC_IDENTITY_URL=https://<render-host>
+NEXT_PUBLIC_POST_URL=https://<render-host>
+NEXT_PUBLIC_FEED_URL=https://<render-host>
+NEXT_PUBLIC_CHAT_URL=https://<render-host>
+NEXT_PUBLIC_COMMUNITY_URL=https://<render-host>
+NEXT_PUBLIC_WS_URL=wss://<render-host>/ws
+```
+
+## Blueprint
+
+Root `render.yaml` defines a single web service `neighbr` with the same build/start commands.
+
+## Legacy split deploy (optional)
+
+`apps/deploy/api` and `apps/deploy/workers` still work as separate processes if you prefer two Render services (~$14/mo with a paid worker). The unified `apps/deploy/all` path is recommended (~$7 Starter web only).
 
 ## Cost note
 
-Render **Background Workers** have no free tier (~$7/mo Starter each). **Web** free tier sleeps after 15 min idle. For always-on MVP, use **Starter** on both (~$14/mo) or merge workers into the web process for ~$7 (not configured by default).
+Render **Background Workers** are paid; the unified web service avoids a separate worker bill. Free web tier sleeps after 15 min idle.
