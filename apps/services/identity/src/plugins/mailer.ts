@@ -20,7 +20,7 @@ export async function sendVerificationEmail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.SMTP_FROM || `"Neighbr" <onboarding@resend.dev>`,
+        from: "onboarding@resend.dev",
         to,
         subject: "Your Neighbr verification code",
         text: `Your verification code is: ${code}\n\nEnter this code in the app to complete your identity verification.\n\nThis code expires in 7 days.`,
