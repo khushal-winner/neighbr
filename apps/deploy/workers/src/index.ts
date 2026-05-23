@@ -1,5 +1,7 @@
 import * as dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";

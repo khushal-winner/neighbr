@@ -11,9 +11,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": [
-    "src",
-    "plugins/prisma.ts",
-    "plugins/auth.ts"
-  ]
+  "include": ["src"]
 }

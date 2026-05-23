@@ -12,6 +12,8 @@ build/
 .env
 .env.local
 .env.production
+**/.env
+!**/.env.example
 
 # Prisma generated client
 **/generated/

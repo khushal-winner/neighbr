@@ -7,11 +7,6 @@
     "./register": "./dist/register.js",
     "./consumers/feed": "./dist/consumers/feed.consumer.js"
   },
-  "exports": {
-    ".": "./dist/index.js",
-    "./register": "./dist/register.js",
-    "./consumers/feed": "./dist/consumers/feed.consumer.js"
-  },
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",
@@ -21,9 +16,10 @@
     "@types/node": "^25.9.0",
     "prisma": "^7.8.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@neighbr/db": "*",
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.1.0",
     "@prisma/client": "^7.8.0",

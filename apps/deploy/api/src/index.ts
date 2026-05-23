@@ -1,5 +1,7 @@
 import * as dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 // CloudAMQP / some managed brokers need this on certain Node builds (dev-friendly).
 if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "1") {
