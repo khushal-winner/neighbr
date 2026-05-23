@@ -262,12 +262,15 @@ export async function verificationRoutes(app: FastifyInstance) {
       const redis = getRedis();
       await redis.set(`postcard:${user.sub}`, code, "EX", 60 * 60 * 24 * 7);
 
-      // Send verification email via Resend
+      // Send verification email via SMTP
       try {
         await sendVerificationEmail(dbUser.email, code);
         console.log("[verification] Verification email sent to", dbUser.email);
       } catch (emailErr) {
         console.error("[verification] Failed to send verification email:", emailErr);
+        return reply.status(500).send({
+          error: "Could not send verification email. Please check SMTP settings or try again later.",
+        });
       }
 
       return reply.send({
