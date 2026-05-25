@@ -3,7 +3,6 @@ dotenv.config();
 
 import amqp from "amqplib";
 import { analyzeText } from "../providers/text.provider";
-import { analyzeImage, preloadModel } from "../providers/image.provider";
 import prisma from "../plugins/prisma";
 import axios from "axios";
 import { getKafkaProducer } from "../plugins/kafka";
@@ -24,15 +23,11 @@ export interface ModerationJob {
 async function processJob(job: ModerationJob): Promise<void> {
   console.log(`[Moderation] processing post: ${job.postId}`);
 
-  // run text + all image checks in parallel - don't do them sequentially
-  const [textResult, ...imageResults] = await Promise.all([
-    analyzeText(job.text),
-    ...job.imageUrls.map((url) => analyzeImage(url)),
-  ]);
+  // text-only moderation - image analysis disabled on free tier (TF.js + NSFWJS exceed 512MB heap)
+  const textResult = await analyzeText(job.text);
 
-  const allResults = [textResult, ...imageResults];
-  const maxScore = Math.max(...allResults.map((r) => r.score));
-  const anyFlagged = allResults.some((r) => r.flagged); // this will be true if any result is flagged
+  const maxScore = textResult.score;
+  const anyFlagged = textResult.flagged;
 
   // trusted users get a higher flagging threshold
   // a community Pillar (score 200+) gets more benefit of the doubt
@@ -140,13 +135,6 @@ export async function startModerationWorker(): Promise<void> {
 
   // one job at a time - don't receive the next until current is ACKed
   channel.prefetch(1);
-
-  // Pre-load NSFWJS model skipped on free tier (saves ~200-250MB heap)
-  // Image analysis will load on-demand and may be slower, but won't OOM
-  if (process.env.NSFW_PRELOAD === "true") {
-    console.log("[Moderation] Pre-loading NSFWJS model...");
-    await preloadModel();
-  }
 
   console.log(`[Moderation] listening on queue: ${QUEUE}`);
 
