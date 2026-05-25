@@ -1,12 +1,12 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { AuthBackground } from '@/components/auth/AuthBackground'
 import { AuthBrandPanel } from '@/components/auth/AuthBrandPanel'
 import { DevModeToggle } from '@/components/DevModeToggle'
 import { ArchitectureModal } from '@/components/ArchitectureModal'
 import { useDevModeStore } from '@/store/devMode'
-import { Network } from 'lucide-react'
+import { Network, X } from 'lucide-react'
 
 type AuthVariant = 'login' | 'register'
 
@@ -19,6 +19,21 @@ export function AuthShell({
 }) {
     const { isDevMode } = useDevModeStore()
     const [showArch, setShowArch] = useState(false)
+    const [showTooltip, setShowTooltip] = useState(false)
+
+    // Hydration-safe load of dismissed state from localStorage
+    useEffect(() => {
+        const dismissed = localStorage.getItem('neighBr-arch-tooltip-dismissed')
+        if (!dismissed) {
+            setShowTooltip(true)
+        }
+    }, [])
+
+    const handleDismissTooltip = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        localStorage.setItem('neighBr-arch-tooltip-dismissed', 'true')
+        setShowTooltip(false)
+    }
 
     return (
         <div className="auth-scene min-h-screen flex relative overflow-hidden">
@@ -49,14 +64,30 @@ export function AuthShell({
             {/* Dev Mode Toggle — bottom right */}
             <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
                 {isDevMode && (
-                    <button
-                        onClick={() => setShowArch(true)}
-                        className="arch-trigger-btn"
-                        id="architecture-btn"
-                    >
-                        <Network size={16} strokeWidth={2.5} />
-                        Architecture
-                    </button>
+                    <div className="arch-tooltip-wrapper">
+                        {showTooltip && (
+                            <div className="arch-tooltip" id="architecture-tooltip">
+                                <p>Explore the architecture of this website to know more</p>
+                                <button
+                                    onClick={handleDismissTooltip}
+                                    className="arch-tooltip-close"
+                                    aria-label="Dismiss architecture tooltip"
+                                    id="close-arch-tooltip-btn"
+                                >
+                                    <X size={12} strokeWidth={2.5} />
+                                </button>
+                                <div className="arch-tooltip-arrow" />
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setShowArch(true)}
+                            className="arch-trigger-btn"
+                            id="architecture-btn"
+                        >
+                            <Network size={16} strokeWidth={2.5} />
+                            Architecture
+                        </button>
+                    </div>
                 )}
                 <DevModeToggle />
             </div>
