@@ -6,7 +6,7 @@ services:
     plan: starter
     region: oregon
     buildCommand: npm ci --include=dev && npm run build:deploy-all
-    startCommand: node apps/deploy/all/dist/index.js
+    startCommand: node --max-old-space-size=4096 --expose-gc apps/deploy/all/dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

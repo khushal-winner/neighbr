@@ -3,7 +3,7 @@ dotenv.config()
 
 import amqp from 'amqplib'
 import { analyzeText } from '../providers/text.provider'
-import { analyzeImage } from '../providers/image.provider'
+import { analyzeImage, preloadModel } from '../providers/image.provider'
 import prisma from '../plugins/prisma'
 import axios from 'axios'
 import { getKafkaProducer } from '../plugins/kafka'
@@ -124,6 +124,10 @@ export async function startModerationWorker(): Promise<void> {
 
     // one job at a time - don't receive the next until current is ACKed 
     channel.prefetch(1)
+
+    // Pre-load NSFWJS model to prevent memory spikes during first job
+    console.log('[Moderation] Pre-loading NSFWJS model...')
+    await preloadModel()
 
     console.log(`[Moderation] listening on queue: ${QUEUE}`)
 
