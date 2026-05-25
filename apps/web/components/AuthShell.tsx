@@ -1,8 +1,12 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { AuthBackground } from '@/components/auth/AuthBackground'
 import { AuthBrandPanel } from '@/components/auth/AuthBrandPanel'
+import { DevModeToggle } from '@/components/DevModeToggle'
+import { ArchitectureModal } from '@/components/ArchitectureModal'
+import { useDevModeStore } from '@/store/devMode'
+import { Network } from 'lucide-react'
 
 type AuthVariant = 'login' | 'register'
 
@@ -13,6 +17,9 @@ export function AuthShell({
     variant: AuthVariant
     children: ReactNode
 }) {
+    const { isDevMode } = useDevModeStore()
+    const [showArch, setShowArch] = useState(false)
+
     return (
         <div className="auth-scene min-h-screen flex relative overflow-hidden">
             <AuthBackground />
@@ -28,7 +35,7 @@ export function AuthShell({
                                 <span className="text-lg">🏘️</span>
                             </div>
                             <span className="font-display font-bold text-xl text-gray-900 tracking-tight">
-                                Neighbr
+                                NeighBr
                             </span>
                         </div>
                     </div>
@@ -38,6 +45,25 @@ export function AuthShell({
                     </div>
                 </div>
             </div>
+
+            {/* Dev Mode Toggle — bottom right */}
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+                {isDevMode && (
+                    <button
+                        onClick={() => setShowArch(true)}
+                        className="arch-trigger-btn"
+                        id="architecture-btn"
+                    >
+                        <Network size={16} strokeWidth={2.5} />
+                        Architecture
+                    </button>
+                )}
+                <DevModeToggle />
+            </div>
+
+            {/* Architecture Modal */}
+            <ArchitectureModal isOpen={showArch} onClose={() => setShowArch(false)} />
         </div>
     )
 }
+

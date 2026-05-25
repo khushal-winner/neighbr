@@ -451,3 +451,475 @@ body::after {
     animation: none !important;
   }
 }
+
+/* ─── Dev Mode Toggle — iOS-style switch ─── */
+
+.dev-toggle-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 14px;
+  border-radius: 50px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s;
+}
+
+.dev-toggle-pill:hover {
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.dev-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.dev-toggle-track {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.dev-toggle-on {
+  background: linear-gradient(135deg, #006565, #00897b);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15), 0 0 8px rgba(0, 128, 128, 0.3);
+}
+
+.dev-toggle-off {
+  background: #cbd5e1;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dev-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dev-toggle-on .dev-toggle-thumb {
+  transform: translateX(23px);
+}
+
+.dev-toggle-off .dev-toggle-thumb {
+  transform: translateX(3px);
+}
+
+/* ─── Architecture Trigger Button ─── */
+
+.arch-trigger-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: white;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: arch-btn-glow 3s ease-in-out infinite;
+}
+
+.arch-trigger-btn:hover {
+  background: linear-gradient(135deg, #0f3460, #1a1a2e);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.35),
+    0 0 16px rgba(0, 128, 128, 0.25);
+  transform: translateY(-2px);
+}
+
+.arch-trigger-btn:active {
+  transform: scale(0.96);
+}
+
+@keyframes arch-btn-glow {
+  0%, 100% { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05); }
+  50% { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 20px rgba(0, 128, 128, 0.15); }
+}
+
+/* ─── Architecture Modal ─── */
+
+.arch-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 20, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: arch-overlay-in 0.3s ease forwards;
+}
+
+@keyframes arch-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.arch-modal {
+  position: relative;
+  width: 95vw;
+  max-width: 1300px;
+  height: 90vh;
+  max-height: 860px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  background: linear-gradient(165deg, #0f1729 0%, #1a1a2e 40%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 32px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  animation: arch-modal-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes arch-modal-in {
+  from { opacity: 0; transform: scale(0.92) translateY(24px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.arch-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.arch-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.arch-modal-title-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(0, 128, 128, 0.25), rgba(0, 101, 101, 0.15));
+  border: 1px solid rgba(0, 128, 128, 0.3);
+  color: #4fd1c5;
+}
+
+.arch-modal-title h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: -0.01em;
+}
+
+.arch-modal-title p {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.arch-modal-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.arch-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Tab bar */
+.arch-tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 8px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+}
+
+.arch-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #94a3b8;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.25s;
+  white-space: nowrap;
+}
+
+.arch-tab:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.arch-tab-active {
+  color: #4fd1c5 !important;
+  background: rgba(0, 128, 128, 0.12) !important;
+  border-color: rgba(0, 128, 128, 0.25) !important;
+  box-shadow: 0 0 12px rgba(0, 128, 128, 0.1);
+}
+
+/* Diagram area */
+.arch-diagram-area {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  position: relative;
+}
+
+.arch-diagram-content {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.arch-diagram-content svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.arch-diagram-visible {
+  opacity: 1;
+}
+
+.arch-diagram-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.arch-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(0, 128, 128, 0.15);
+  border-top-color: #4fd1c5;
+  border-radius: 50%;
+  animation: arch-spin 0.8s linear infinite;
+}
+
+@keyframes arch-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Legend */
+.arch-legend {
+  display: flex;
+  gap: 20px;
+  padding: 12px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+.arch-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.arch-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* ─── Quick Login ─── */
+
+.quick-login-section {
+  margin-top: 4px;
+}
+
+.quick-login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.quick-login-divider::before,
+.quick-login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 101, 101, 0.15), transparent);
+}
+
+.quick-login-divider span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.quick-login-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.quick-login-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #006565;
+  background: rgba(0, 128, 128, 0.08);
+  border: 1.5px solid rgba(0, 128, 128, 0.2);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.quick-login-btn:hover {
+  background: rgba(0, 128, 128, 0.14);
+  border-color: rgba(0, 128, 128, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 128, 128, 0.12);
+  transform: translateY(-1px);
+}
+
+.quick-login-btn:active {
+  transform: scale(0.97);
+}
+
+.quick-login-info-wrap {
+  position: relative;
+}
+
+.quick-login-info-trigger {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 128, 128, 0.2);
+  background: rgba(0, 128, 128, 0.06);
+  color: #006565;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-login-info-trigger:hover {
+  background: rgba(0, 128, 128, 0.12);
+  border-color: rgba(0, 128, 128, 0.35);
+  box-shadow: 0 0 10px rgba(0, 128, 128, 0.15);
+}
+
+.quick-login-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: -10px;
+  width: 240px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 128, 128, 0.15);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: quick-tooltip-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  z-index: 100;
+}
+
+.quick-login-tooltip strong {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #006565;
+}
+
+.quick-login-tooltip span {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.quick-login-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  right: 18px;
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border-right: 1px solid rgba(0, 128, 128, 0.15);
+  border-bottom: 1px solid rgba(0, 128, 128, 0.15);
+  transform: rotate(45deg);
+}
+
+@keyframes quick-tooltip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

@@ -1,4 +1,4 @@
-# Neighbr
+# NeighBr
 
 <p align="center">
   <img src="https://img.shields.io/badge/Node-%3E%3D18-339933?logo=node.js" alt="Node >=18" />
@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
-**Neighbr** is a hyperlocal neighbourhood platform built on verified residency. It delivers real-time alerts, contextual community feeds, direct messaging, and trust scoring — all scoped to a user's actual street and community boundaries.
+**NeighBr** is a hyperlocal neighbourhood platform built on verified residency. It delivers real-time alerts, contextual community feeds, direct messaging, and trust scoring — all scoped to a user's actual street and community boundaries.
 
 ---
 
@@ -29,125 +29,139 @@
 
 ### High-Level Architecture
 
+```mermaid
+graph TB
+    subgraph CLIENT["🖥️ Client Layer"]
+        WEB["<b>Next.js 16 Frontend</b><br/>React 19 · Tailwind 4<br/>Port 3000"]
+    end
+
+    subgraph GATEWAY["🌐 Gateway Layer"]
+        HTTP["<b>Fastify HTTP API</b><br/>JWT Middleware<br/>Rate Limiting"]
+        WS["<b>Go WebSocket Gateway</b><br/>Real-time Presence<br/>Message Broadcasting<br/>Port 8080"]
+    end
+
+    subgraph SERVICES["⚙️ Microservices Layer"]
+        IDENTITY["<b>Identity :3001</b><br/>JWT Auth · Verify<br/>Profile CRUD"]
+        POST["<b>Post :3002</b><br/>Post CRUD<br/>Cloudinary Media"]
+        MOD["<b>Moderation :3003</b><br/>AI Analysis<br/>Admin Verdicts"]
+        FEED["<b>Feed :3004</b><br/>Redis Sorted Sets<br/>Kafka Consumer"]
+        CHAT["<b>Chat :3005</b><br/>DMs · Groups<br/>Presence"]
+        COMMUNITY["<b>Community :3007</b><br/>Polls · Boundaries<br/>Micro-Communities"]
+        WEBHOOK["<b>Webhook :3008</b><br/>Ingest · Route"]
+    end
+
+    subgraph WORKERS["🔄 Async Workers"]
+        ALERT_W["<b>Alert Worker</b><br/>PostGIS Geofence<br/>Fan-out"]
+        TRUST_W["<b>Trust Worker</b><br/>Score Calc<br/>Reputation"]
+        NOTIF_W["<b>Notification Worker</b><br/>FCM Batch<br/>Redis Windows"]
+        DIGEST_W["<b>Digest Worker</b><br/>Weekly Emails<br/>BullMQ Cron"]
+    end
+
+    subgraph BROKERS["📨 Message Brokers"]
+        KAFKA["<b>Apache Kafka</b><br/>post.created · post.approved<br/>alerts.city · trust.events"]
+        RABBIT["<b>RabbitMQ</b><br/>moderation.jobs"]
+        BULL["<b>BullMQ</b><br/>digest.cron<br/>notification.jobs"]
+    end
+
+    subgraph DATA["💾 Data Layer"]
+        PG["<b>PostgreSQL + PostGIS</b><br/>Neon Cloud<br/>Users · Posts · Polls · Trust"]
+        REDIS["<b>Redis (Upstash)</b><br/>Feed Sorted Sets · Sessions<br/>Pub/Sub · Streams"]
+    end
+
+    subgraph EXTERNAL["☁️ External Services"]
+        FIREBASE["<b>Firebase</b><br/>FCM Push"]
+        RESEND["<b>Resend</b><br/>Email Delivery"]
+        CLOUDINARY["<b>Cloudinary</b><br/>Media CDN"]
+    end
+
+    WEB -->|REST API| HTTP
+    WEB -->|WebSocket| WS
+    HTTP --> IDENTITY & POST & MOD & FEED & CHAT & COMMUNITY & WEBHOOK
+    SERVICES --> BROKERS
+    BROKERS --> WORKERS
+    SERVICES --> DATA
+    WORKERS --> DATA
+    WORKERS --> EXTERNAL
+    WS --> REDIS
+
+    classDef client fill:#1a1a2e,stroke:#16213e,color:#e2e8f0,stroke-width:2px
+    classDef gateway fill:#0f3460,stroke:#16213e,color:#e2e8f0,stroke-width:2px
+    classDef service fill:#006565,stroke:#004d4d,color:#e2e8f0,stroke-width:2px
+    classDef worker fill:#533483,stroke:#3d2066,color:#e2e8f0,stroke-width:2px
+    classDef broker fill:#e94560,stroke:#c73750,color:#fff,stroke-width:2px
+    classDef data fill:#0a7c5a,stroke:#065e44,color:#e2e8f0,stroke-width:2px
+    classDef external fill:#d4880f,stroke:#b5730d,color:#1a1a2e,stroke-width:2px
+
+    class WEB client
+    class HTTP,WS gateway
+    class IDENTITY,POST,MOD,FEED,CHAT,COMMUNITY,WEBHOOK service
+    class ALERT_W,TRUST_W,NOTIF_W,DIGEST_W worker
+    class KAFKA,RABBIT,BULL broker
+    class PG,REDIS data
+    class FIREBASE,RESEND,CLOUDINARY external
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    CLIENT LAYER                                                  │
-├─────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                         Next.js Frontend (Port 3000)                                      │  │
-│  │                    React 19 · Tailwind CSS 4 · App Router                                 │  │
-│  └────────────────────────────┬─────────────────────────────────────────────────────────────┘  │
-└───────────────────────────────┼────────────────────────────────────────────────────────────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │                               │
-                ▼                               ▼
-┌─────────────────────────────────┐  ┌─────────────────────────────────┐
-│      HTTP API Gateway           │  │      WebSocket Gateway           │
-│         (Port 3000)             │  │         (Go)                     │
-│  ┌───────────────────────────┐  │  │  ┌───────────────────────────┐  │
-│  │  Fastify + JWT Middleware │  │  │  │  Real-time Presence      │  │
-│  │  Request Routing          │  │  │  │  WebSocket Connections   │  │
-│  │  Rate Limiting             │  │  │  │  Message Broadcasting    │  │
-│  └───────────────────────────┘  │  │  └───────────────────────────┘  │
-└───────────┬─────────────────────┘  └─────────────────────────────────┘
-            │
-            │ RPC/HTTP
-            ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    MICROSERVICES LAYER                                            │
-├─────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  Identity    │  │     Post     │  │     Feed     │  │     Chat     │  │  Community   │    │
-│  │   :3001      │  │    :3002     │  │    :3004     │  │    :3005     │  │    :3007     │    │
-│  │              │  │              │  │              │  │              │  │              │    │
-│  │ • JWT Auth   │  │ • Post CRUD  │  │ • Feed Read  │  │ • DMs        │  │ • Polls      │    │
-│  │ • Verify     │  │ • Moderation │  │ • Kafka Sub  │  │ • Groups     │  │ • Micro-Com  │    │
-│  │ • Profile    │  │ • RabbitMQ   │  │ • Redis SS   │  │ • Presence   │  │ • Boundaries │    │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘    │
-│         │                 │                 │                 │                 │            │
-│         └─────────────────┴─────────────────┴─────────────────┴─────────────────┘            │
-│                                           │                                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  Moderation  │  │   Webhook    │  │              │  │              │  │              │    │
-│  │   :3003      │  │    :3008     │  │              │  │              │  │              │    │
-│  │              │  │              │  │              │  │              │  │              │    │
-│  │ • AI Mod     │  │ • Ingest     │  │              │  │              │  │              │    │
-│  │ • Admin API  │  │ • Processing │  │              │  │              │  │              │    │
-│  │ • RabbitMQ   │  │ • Routing    │  │              │  │              │  │              │    │
-│  └──────────────┘  └──────────────┘  │              │  │              │  │              │    │
-│                                   │              │  │              │  │              │    │
-└───────────────────────────────────┼──────────────┼──┼──────────────┼──┼──────────────┼────┘
-                                    │              │  │              │  │              │
-                                    ▼              ▼  ▼              ▼  ▼              ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                  ASYNC WORKERS LAYER                                              │
-├─────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │    Alert     │  │    Trust     │  │ Notification │  │    Digest    │  │              │    │
-│  │   Worker     │  │   Worker     │  │   Worker     │  │   Worker     │  │              │    │
-│  │              │  │              │  │              │  │              │  │              │    │
-│  │ • PostGIS    │  │ • Score Calc │  │ • FCM Batch  │  │ • Weekly     │  │              │    │
-│  │ • Geofence   │  │ • Kafka Sub  │  │ • Redis Win  │  │ • BullMQ     │  │              │    │
-│  │ • Fan-out    │  │ • Reputation │  │ • Firebase   │  │ • Resend     │  │              │    │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
-│                                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                  MESSAGE BROKERS LAYER                                           │
-├─────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                 │
-│  ┌──────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐       │
-│  │       Kafka Broker       │  │       RabbitMQ Broker     │  │       BullMQ             │       │
-│  │  (Event Streaming)       │  │  (Moderation Queue)       │  │  (Job Queue)             │       │
-│  │                          │  │                          │  │                          │       │
-│  │ • post.created           │  │ • moderation.jobs        │  │ • digest.cron           │       │
-│  │ • post.approved          │  │ • ai.analysis            │  │ • notification.jobs     │       │
-│  │ • alerts.{city}          │  │                          │  │                          │       │
-│  │ • trust.events           │  │                          │  │                          │       │
-│  └──────────────────────────┘  └──────────────────────────┘  └──────────────────────────┘       │
-│                                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                  DATA LAYER                                                      │
-├─────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                 │
-│  ┌──────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐       │
-│  │   PostgreSQL + PostGIS    │  │         Redis             │  │         Redis             │       │
-│  │       (Neon Cloud)        │  │       (Upstash)          │  │       (Upstash)          │       │
-│  │                          │  │                          │  │                          │       │
-│  │ • Users, Posts, Polls     │  │ • Sorted Sets (Feed)     │  │ • Pub/Sub (Presence)     │       │
-│  │ • Communities, Trust      │  │ • Streams (Alerts)       │  │ • Batching Windows       │       │
-│  │ • Geospatial Data         │  │ • Cache (Sessions)       │  │ • Rate Limiting          │       │
-│  └──────────────────────────┘  └──────────────────────────┘  └──────────────────────────┘       │
-│                                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                               EXTERNAL SERVICES                                                  │
-├─────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                 │
-│  ┌──────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐       │
-│  │      Firebase             │  │        Resend             │  │       Cloudinary         │       │
-│  │    (FCM Push)             │  │      (Email)             │  │    (Media Storage)       │       │
-│  │                          │  │                          │  │                          │       │
-│  │ • Push Notifications     │  │ • Transactional Email    │  │ • Image Upload           │       │
-│  │ • Device Tokens          │  │ • Weekly Digests         │  │ • CDN Delivery           │       │
-│  └──────────────────────────┘  └──────────────────────────┘  └──────────────────────────┘       │
-│                                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+
 
 ### Backend Architecture Deep Dive
 
 #### Service Communication Patterns
+
+```mermaid
+graph LR
+    subgraph SYNC["🔄 Synchronous - HTTP/RPC"]
+        FE["Next.js Frontend"]
+        API["Fastify API Gateway"]
+        ID["Identity Service"]
+        PS["Post Service"]
+        FS["Feed Service"]
+        CS["Chat Service"]
+        CM["Community Service"]
+        WH["Webhook Service"]
+
+        FE -->|"REST + JWT"| API
+        API -->|"Route"| ID & PS & FS & CS & CM & WH
+        ID -->|"JWT Validate"| PS & FS & CS & CM
+    end
+
+    subgraph ASYNC_KAFKA["📡 Async - Kafka Event Streaming"]
+        K_POST["post.created"]
+        K_APPROVED["post.approved"]
+        K_ALERT["alerts.city"]
+        K_TRUST["trust.events"]
+
+        PS2["Post Service"] -->|"publish"| K_POST
+        MOD2["Moderation"] -->|"publish"| K_APPROVED
+        K_APPROVED -->|"consume"| FEED2["Feed Worker"]
+        K_APPROVED -->|"consume"| NOTIF2["Notification Worker"]
+        K_POST -->|"consume"| TRUST2["Trust Worker"]
+        K_ALERT -->|"consume"| ALERT2["Alert Worker"]
+    end
+
+    subgraph ASYNC_RABBIT["🐇 Point-to-Point - RabbitMQ"]
+        MQ["moderation.jobs queue"]
+        PS3["Post Service"] -->|"enqueue"| MQ
+        MQ -->|"consume"| MOD3["Moderation Worker"]
+    end
+
+    subgraph ASYNC_BULL["⏰ Job Queue - BullMQ + Redis"]
+        BQ["digest.cron"]
+        NQ["notification.jobs"]
+        BQ -->|"weekly"| DIG["Digest Worker"]
+        NQ -->|"batch"| NOT["Notification Worker"]
+    end
+
+    subgraph PUBSUB["📢 Pub/Sub - Redis"]
+        RPUB["Redis Pub/Sub"]
+        GW["Go WebSocket Gateway"] <-->|"subscribe"| RPUB
+        ALERT3["Alert Service"] -->|"publish"| RPUB
+    end
+
+    classDef sync fill:#006565,stroke:#004d4d,color:#e2e8f0,stroke-width:2px
+    classDef kafka fill:#e94560,stroke:#c73750,color:#fff,stroke-width:2px
+    classDef rabbit fill:#ff8c42,stroke:#e07535,color:#1a1a2e,stroke-width:2px
+    classDef bull fill:#533483,stroke:#3d2066,color:#e2e8f0,stroke-width:2px
+    classDef redis fill:#0a7c5a,stroke:#065e44,color:#e2e8f0,stroke-width:2px
+```
 
 **1. Synchronous HTTP/RPC**
 - **Identity → All Services**: JWT token validation via shared middleware
@@ -175,55 +189,69 @@
 
 #### Data Flow Patterns
 
-**Feed Generation Pipeline**
-```
-User creates post
-    ↓
-Post service validates & saves to PostgreSQL
-    ↓
-Post service publishes to RabbitMQ (moderation queue)
-    ↓
-Moderation worker analyzes content (AI)
-    ↓
-If approved → publishes to Kafka (post.approved)
-    ↓
-Feed worker consumes event → inserts into Redis sorted-set
-    ↓
-Notification worker consumes event → batches FCM push
-    ↓
-Trust worker consumes event → updates user trust score
-```
+```mermaid
+graph TD
+    USER["👤 User Creates Post"] --> VALIDATE
 
-**Alert Broadcasting Pipeline**
-```
-Admin triggers emergency alert
-    ↓
-Alert service publishes to Kafka (alerts.{city})
-    ↓
-Alert worker consumes → PostGIS geospatial query
-    ↓
-For each affected user:
-    ├─ Push to Redis stream (community-specific)
-    └─ Queue immediate FCM notification
-    ↓
-WebSocket Gateway subscribes to Redis streams
-    ↓
-Push to connected users in real-time
-```
+    subgraph POST_SVC["📝 Post Service :3002"]
+        VALIDATE["Validate JWT + Zod"] --> UPLOAD["Upload Media → Cloudinary"]
+        UPLOAD --> SAVE_DB["Save to PostgreSQL"]
+        SAVE_DB --> PUBLISH_RMQ["Publish → RabbitMQ"]
+    end
 
-**Trust Score Calculation**
-```
-User action (post, comment, vote)
-    ↓
-Service publishes trust event to Kafka
-    ↓
-Trust worker consumes event
-    ↓
-Calculates score delta based on action type
-    ↓
-Updates CommunityTrust in PostgreSQL
-    ↓
-Publishes updated score to Kafka (for cache invalidation)
+    PUBLISH_RMQ --> CONSUME_MOD
+
+    subgraph MOD_SVC["🛡️ Moderation Service :3003"]
+        CONSUME_MOD["Consume from RabbitMQ"] --> AI["AI Content Analysis<br/>Perspective API"]
+        AI -->|"APPROVED"| PUB_KAFKA_OK["Publish → Kafka<br/>post.approved"]
+        AI -->|"FLAGGED"| PUB_KAFKA_FLAG["Publish → Kafka<br/>post.flagged"]
+        AI --> UPDATE_STATUS["Update Post Status<br/>in PostgreSQL"]
+    end
+
+    PUB_KAFKA_OK --> FEED_CONSUME & NOTIF_CONSUME & TRUST_CONSUME
+
+    subgraph FEED_SVC["📰 Feed Service :3004"]
+        FEED_CONSUME["Consume post.approved"] --> REDIS_INSERT["Insert → Redis<br/>Sorted Set<br/>score = timestamp"]
+        REDIS_INSERT --> FEED_READY["Feed Ready<br/>for Pagination"]
+    end
+
+    subgraph NOTIF_SVC["🔔 Notification Worker"]
+        NOTIF_CONSUME["Consume post.approved"] --> BATCH["Batch by Community<br/>Redis Time Window"]
+        BATCH --> FCM["Send via Firebase<br/>FCM Push"]
+    end
+
+    subgraph TRUST_SVC["⭐ Trust Worker"]
+        TRUST_CONSUME["Consume post.created"] --> CALC["Calculate Score Delta"]
+        CALC --> UPDATE_TRUST["Update CommunityTrust<br/>in PostgreSQL"]
+        UPDATE_TRUST --> CACHE_INVAL["Publish Updated Score<br/>→ Cache Invalidation"]
+    end
+
+    subgraph ALERT_FLOW["🚨 Alert Flow"]
+        ADMIN["Admin Triggers Alert"] --> ALERT_SVC["Alert Service"]
+        ALERT_SVC --> KAFKA_ALERT["Publish → Kafka<br/>alerts.city"]
+        KAFKA_ALERT --> ALERT_WORKER["Alert Worker"]
+        ALERT_WORKER --> POSTGIS["PostGIS Geofence<br/>Radius Query"]
+        POSTGIS --> REDIS_STREAM["Push → Redis Stream"]
+        POSTGIS --> FCM_ALERT["Immediate FCM Push"]
+        REDIS_STREAM --> WS_GW["Go WebSocket Gateway"]
+        WS_GW --> REALTIME["Real-time Push<br/>to Connected Users"]
+    end
+
+    classDef user fill:#1a1a2e,stroke:#16213e,color:#e2e8f0,stroke-width:2px
+    classDef post fill:#006565,stroke:#004d4d,color:#e2e8f0,stroke-width:2px
+    classDef mod fill:#e94560,stroke:#c73750,color:#fff,stroke-width:2px
+    classDef feed fill:#0a7c5a,stroke:#065e44,color:#e2e8f0,stroke-width:2px
+    classDef notif fill:#533483,stroke:#3d2066,color:#e2e8f0,stroke-width:2px
+    classDef trust fill:#d4880f,stroke:#b5730d,color:#1a1a2e,stroke-width:2px
+    classDef alert fill:#ff8c42,stroke:#e07535,color:#1a1a2e,stroke-width:2px
+
+    class USER user
+    class VALIDATE,UPLOAD,SAVE_DB,PUBLISH_RMQ post
+    class CONSUME_MOD,AI,PUB_KAFKA_OK,PUB_KAFKA_FLAG,UPDATE_STATUS mod
+    class FEED_CONSUME,REDIS_INSERT,FEED_READY feed
+    class NOTIF_CONSUME,BATCH,FCM notif
+    class TRUST_CONSUME,CALC,UPDATE_TRUST,CACHE_INVAL trust
+    class ADMIN,ALERT_SVC,KAFKA_ALERT,ALERT_WORKER,POSTGIS,REDIS_STREAM,FCM_ALERT,WS_GW,REALTIME alert
 ```
 
 #### Scalability Design
@@ -435,18 +463,111 @@ neighbr/
 
 ### Relationships
 
-```
-City (1) ──────< (N) MicroCommunity
-MicroCommunity (1) ──────< (N) User
-MicroCommunity (1) ──────< (N) Post
-User (1) ──────< (N) Post
-User (1) ──────< (N) FcmToken
-Post (1) ──────< (1) Poll
-Poll (1) ──────< (N) Vote
-MicroCommunity (1) ──────< (N) PinnedPost
-User (1) ──────< (N) EventLog
-City (1) ──────< (N) AlertBroadcast
-User (1) ──────< (N) CommunityTrust
+```mermaid
+erDiagram
+    City ||--o{ MicroCommunity : contains
+    City ||--o{ AlertBroadcast : triggers
+    MicroCommunity ||--o{ User : "residents"
+    MicroCommunity ||--o{ Post : "scoped to"
+    MicroCommunity ||--o{ PinnedPost : has
+    User ||--o{ Post : authors
+    User ||--o{ FcmToken : "push tokens"
+    User ||--o{ EventLog : "audit trail"
+    User ||--o{ CommunityTrust : "trust score"
+    User ||--o{ Vote : casts
+    Post ||--o| Poll : "may have"
+    Poll ||--o{ Vote : receives
+
+    City {
+        uuid id PK
+        string name
+        string country
+        string timezone
+    }
+
+    MicroCommunity {
+        uuid id PK
+        uuid cityId FK
+        string name
+        geometry boundary "PostGIS"
+        int population
+    }
+
+    User {
+        uuid id PK
+        string email UK
+        string passwordHash
+        string displayName
+        string verificationLevel
+        uuid communityId FK
+        float trustScore
+        string trustBand
+        datetime createdAt
+    }
+
+    Post {
+        uuid id PK
+        uuid authorId FK
+        uuid communityId FK
+        text content
+        json mediaUrls "Cloudinary"
+        string status "pending|approved|removed"
+        datetime createdAt
+    }
+
+    Poll {
+        uuid id PK
+        uuid postId FK
+        string question
+        json options
+        datetime expiresAt
+    }
+
+    Vote {
+        uuid id PK
+        uuid pollId FK
+        uuid userId FK
+        int selectedOption
+    }
+
+    FcmToken {
+        uuid id PK
+        uuid userId FK
+        string token
+        string deviceInfo
+    }
+
+    PinnedPost {
+        uuid id PK
+        uuid communityId FK
+        uuid postId FK
+        uuid pinnedBy FK
+    }
+
+    EventLog {
+        uuid id PK
+        uuid userId FK
+        string action
+        json metadata
+        datetime timestamp
+    }
+
+    AlertBroadcast {
+        uuid id PK
+        uuid cityId FK
+        text message
+        string severity
+        int radiusMeters
+        point centerPoint "PostGIS"
+    }
+
+    CommunityTrust {
+        uuid id PK
+        uuid userId FK
+        uuid communityId FK
+        float score
+        datetime lastUpdated
+    }
 ```
 
 ---
@@ -605,123 +726,69 @@ npm run format
 
 ## 📡 Event Flow
 
-### Post Creation & Moderation Flow
+```mermaid
+graph TD
+    USER["👤 User Creates Post"] --> VALIDATE
 
-```
-┌─────────┐
-│  User   │
-└────┬────┘
-     │ POST /posts
-     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        Post Service                              │
-│  1. Validate JWT token                                          │
-│  2. Validate request body (Zod)                                 │
-│  3. Upload media to Cloudinary (if any)                         │
-│  4. Save post to PostgreSQL                                     │
-│  5. Publish to RabbitMQ (moderation queue)                      │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Moderation Service                            │
-│  1. Consume from RabbitMQ                                        │
-│  2. Analyze content (AI / Perspective API)                       │
-│  3. If approved:                                                 │
-│     - Publish to Kafka (post.approved)                          │
-│     - Update post status in PostgreSQL                          │
-│  4. If flagged:                                                 │
-│     - Publish to Kafka (post.flagged)                           │
-│     - Notify admin for manual review                            │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────┴─────────┐
-                    │                   │
-                    ▼                   ▼
-┌──────────────────────────┐  ┌──────────────────────────┐
-│      Feed Service         │  │   Notification Service   │
-│  1. Consume post.approved│  │  1. Consume post.approved│
-│  2. Insert into Redis     │  │  2. Batch by community   │
-│     sorted-set           │  │  3. Queue FCM push       │
-│  3. Publish post.created │  │  4. Send via Firebase    │
-│     (for other workers)   │  └──────────────────────────┘
-└──────────┬───────────────┘
-           │
-           ▼
-┌──────────────────────────┐
-│      Trust Service       │
-│  1. Consume post.created│
-│  2. Calculate score     │
-│  3. Update CommunityTrust│
-│     in PostgreSQL        │
-└──────────────────────────┘
-```
+    subgraph POST_SVC["📝 Post Service :3002"]
+        VALIDATE["Validate JWT + Zod"] --> UPLOAD["Upload Media → Cloudinary"]
+        UPLOAD --> SAVE_DB["Save to PostgreSQL"]
+        SAVE_DB --> PUBLISH_RMQ["Publish → RabbitMQ"]
+    end
 
-### Alert Broadcasting Flow
+    PUBLISH_RMQ --> CONSUME_MOD
 
-```
-┌─────────┐
-│  Admin  │
-└────┬────┘
-     │ POST /alerts
-     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Alert Service                              │
-│  1. Validate JWT token (admin only)                             │
-│  2. Validate alert data                                         │
-│  3. Save alert to PostgreSQL                                    │
-│  4. Publish to Kafka (alerts.{city})                            │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  Alert Worker (Consumer)                         │
-│  1. Consume from Kafka (alerts.{city})                          │
-│  2. Query PostgreSQL + PostGIS for users within radius          │
-│  3. For each affected user:                                     │
-│     - Push to Redis stream (community-specific)                 │
-│     - Queue immediate FCM notification                          │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────┴─────────┐
-                    │                   │
-                    ▼                   ▼
-┌──────────────────────────┐  ┌──────────────────────────┐
-│   WebSocket Gateway       │  │   Notification Service   │
-│  1. Subscribe to Redis    │  │  1. Consume alert event  │
-│     streams               │  │  2. Send immediate FCM  │
-│  2. Push to connected    │  │     push to affected users│
-│     users in community    │  └──────────────────────────┘
-└──────────────────────────┘
-```
+    subgraph MOD_SVC["🛡️ Moderation Service :3003"]
+        CONSUME_MOD["Consume from RabbitMQ"] --> AI["AI Content Analysis<br/>Perspective API"]
+        AI -->|"APPROVED"| PUB_KAFKA_OK["Publish → Kafka<br/>post.approved"]
+        AI -->|"FLAGGED"| PUB_KAFKA_FLAG["Publish → Kafka<br/>post.flagged"]
+        AI --> UPDATE_STATUS["Update Post Status<br/>in PostgreSQL"]
+    end
 
-### Trust Score Calculation Flow
+    PUB_KAFKA_OK --> FEED_CONSUME & NOTIF_CONSUME & TRUST_CONSUME
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    User Action Event                              │
-│  (post created, comment added, vote cast, etc.)                 │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   Service Publishing Event                       │
-│  1. Determine action type                                       │
-│  2. Calculate base score delta                                 │
-│  3. Publish to Kafka (trust.events)                            │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Trust Service (Consumer)                      │
-│  1. Consume trust.events from Kafka                             │
-│  2. Fetch current CommunityTrust score                          │
-│  3. Apply score delta with decay factor                         │
-│  4. Update CommunityTrust in PostgreSQL                         │
-│  5. Publish updated score (for cache invalidation)              │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph FEED_SVC["📰 Feed Service :3004"]
+        FEED_CONSUME["Consume post.approved"] --> REDIS_INSERT["Insert → Redis<br/>Sorted Set<br/>score = timestamp"]
+        REDIS_INSERT --> FEED_READY["Feed Ready<br/>for Pagination"]
+    end
+
+    subgraph NOTIF_SVC["🔔 Notification Worker"]
+        NOTIF_CONSUME["Consume post.approved"] --> BATCH["Batch by Community<br/>Redis Time Window"]
+        BATCH --> FCM["Send via Firebase<br/>FCM Push"]
+    end
+
+    subgraph TRUST_SVC["⭐ Trust Worker"]
+        TRUST_CONSUME["Consume post.created"] --> CALC["Calculate Score Delta"]
+        CALC --> UPDATE_TRUST["Update CommunityTrust<br/>in PostgreSQL"]
+        UPDATE_TRUST --> CACHE_INVAL["Publish Updated Score<br/>→ Cache Invalidation"]
+    end
+
+    subgraph ALERT_FLOW["🚨 Alert Flow"]
+        ADMIN["Admin Triggers Alert"] --> ALERT_SVC["Alert Service"]
+        ALERT_SVC --> KAFKA_ALERT["Publish → Kafka<br/>alerts.city"]
+        KAFKA_ALERT --> ALERT_WORKER["Alert Worker"]
+        ALERT_WORKER --> POSTGIS["PostGIS Geofence<br/>Radius Query"]
+        POSTGIS --> REDIS_STREAM["Push → Redis Stream"]
+        POSTGIS --> FCM_ALERT["Immediate FCM Push"]
+        REDIS_STREAM --> WS_GW["Go WebSocket Gateway"]
+        WS_GW --> REALTIME["Real-time Push<br/>to Connected Users"]
+    end
+
+    classDef user fill:#1a1a2e,stroke:#16213e,color:#e2e8f0,stroke-width:2px
+    classDef post fill:#006565,stroke:#004d4d,color:#e2e8f0,stroke-width:2px
+    classDef mod fill:#e94560,stroke:#c73750,color:#fff,stroke-width:2px
+    classDef feed fill:#0a7c5a,stroke:#065e44,color:#e2e8f0,stroke-width:2px
+    classDef notif fill:#533483,stroke:#3d2066,color:#e2e8f0,stroke-width:2px
+    classDef trust fill:#d4880f,stroke:#b5730d,color:#1a1a2e,stroke-width:2px
+    classDef alert fill:#ff8c42,stroke:#e07535,color:#1a1a2e,stroke-width:2px
+
+    class USER user
+    class VALIDATE,UPLOAD,SAVE_DB,PUBLISH_RMQ post
+    class CONSUME_MOD,AI,PUB_KAFKA_OK,PUB_KAFKA_FLAG,UPDATE_STATUS mod
+    class FEED_CONSUME,REDIS_INSERT,FEED_READY feed
+    class NOTIF_CONSUME,BATCH,FCM notif
+    class TRUST_CONSUME,CALC,UPDATE_TRUST,CACHE_INVAL trust
+    class ADMIN,ALERT_SVC,KAFKA_ALERT,ALERT_WORKER,POSTGIS,REDIS_STREAM,FCM_ALERT,WS_GW,REALTIME alert
 ```
 
 ---

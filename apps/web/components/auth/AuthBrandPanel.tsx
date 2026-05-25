@@ -33,7 +33,7 @@ export function AuthBrandPanel({ variant }: { variant: AuthVariant }) {
                     <div className="auth-logo-mark">
                         <span className="text-xl">🏘️</span>
                     </div>
-                    <span className="font-display font-bold text-2xl tracking-tight">Neighbr</span>
+                    <span className="font-display font-bold text-2xl tracking-tight">NeighBr</span>
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-semibold uppercase tracking-widest mb-6 auth-badge-shimmer">

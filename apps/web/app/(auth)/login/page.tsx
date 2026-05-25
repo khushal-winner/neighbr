@@ -8,7 +8,7 @@ import { setAccessToken } from '@/lib/auth'
 import { useAuthStore } from '@/store/auth'
 import { AuthShell } from '@/components/AuthShell'
 import { AuthFormCard } from '@/components/auth/AuthFormCard'
-import { LogIn, Mail, Lock, CheckCircle2, Loader2 } from 'lucide-react'
+import { LogIn, Mail, Lock, CheckCircle2, Loader2, Info, Zap } from 'lucide-react'
 
 function LoginForm() {
     const router = useRouter()
@@ -19,12 +19,18 @@ function LoginForm() {
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [showRegistered, setShowRegistered] = useState(false)
+    const [showQuickInfo, setShowQuickInfo] = useState(false)
 
     useEffect(() => {
         if (searchParams.get('registered') === '1') {
             setShowRegistered(true)
         }
     }, [searchParams])
+
+    function handleQuickLogin() {
+        setEmail('neighbrlogin999@gmail.com')
+        setPassword('freelogin')
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -59,7 +65,7 @@ function LoginForm() {
             icon={<LogIn size={28} strokeWidth={1.75} />}
             footer={
                 <p className="text-center text-sm text-gray-500 font-sans">
-                    New to Neighbr?{' '}
+                    New to NeighBr?{' '}
                     <Link
                         href="/register"
                         className="font-semibold text-primary hover:text-primary-container transition-colors"
@@ -129,6 +135,43 @@ function LoginForm() {
                         'Sign in'
                     )}
                 </button>
+
+                {/* Quick Login */}
+                <div className="quick-login-section" id="quick-login-section">
+                    <div className="quick-login-divider">
+                        <span>or</span>
+                    </div>
+                    <div className="quick-login-row">
+                        <button
+                            type="button"
+                            onClick={handleQuickLogin}
+                            className="quick-login-btn"
+                            id="quick-login-btn"
+                        >
+                            <Zap size={16} strokeWidth={2.5} />
+                            Quick Login
+                        </button>
+                        <div className="quick-login-info-wrap">
+                            <button
+                                type="button"
+                                className="quick-login-info-trigger"
+                                onClick={() => setShowQuickInfo(!showQuickInfo)}
+                                onMouseEnter={() => setShowQuickInfo(true)}
+                                onMouseLeave={() => setShowQuickInfo(false)}
+                                aria-label="What is Quick Login?"
+                                id="quick-login-info-btn"
+                            >
+                                <Info size={17} />
+                            </button>
+                            {showQuickInfo && (
+                                <div className="quick-login-tooltip" id="quick-login-tooltip">
+                                    <strong>Public demo account</strong>
+                                    <span>Skip address &amp; email verification and explore the app instantly. Credentials are shared for everyone to test.</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </form>
         </AuthFormCard>
     )
