@@ -59,6 +59,7 @@ async function main(): Promise<void> {
     await app.register(httpProxy, {
       upstream: gatewayUpstream(gatewayPort),
       prefix: "/ws",
+      rewritePrefix: "/ws",
       websocket: true,
     });
   }
