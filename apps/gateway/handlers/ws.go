@@ -7,7 +7,7 @@
 // Subscribes to Redis pub/sub channels
 // Cleans up everything on disconnect
 
-package handlers 
+package handlers
 
 import (
 	"context"
@@ -21,24 +21,27 @@ import (
 	"github.com/gorilla/websocket"
 	goredis "github.com/redis/go-redis/v9"
 
-	redisclient "github.com/neighbr/gateway/redis"
 	"github.com/neighbr/gateway/hub"
 	"github.com/neighbr/gateway/middleware"
+	redisclient "github.com/neighbr/gateway/redis"
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize: 1024,
+	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	// in production: validate origin header against allowed domains
+	// if origin is empty (same-origin request), allow it
 	CheckOrigin: func(r *http.Request) bool {
-        origin := r.Header.Get("Origin")
-        allowed := os.Getenv("FRONTEND_URL")
-        if allowed == "" {
-            allowed = "http://localhost:3000"
-        }
-        return origin == allowed
-    },
-
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // same-origin request (browser doesn't send Origin)
+		}
+		allowed := os.Getenv("FRONTEND_URL")
+		if allowed == "" {
+			return true // dev: allow all origins
+		}
+		return origin == allowed
+	},
 }
 
 // first message the client must send after connecting
@@ -49,9 +52,9 @@ type AuthMessage struct {
 }
 
 const (
-	writeWait = 10 * time.Second	// max time to write a message to the socket
-	pongWait = 60 * time.Second		// max time to wait for a pong response
-	pingPeriod = 10 * time.Second	// how often to send a ping
+	writeWait  = 10 * time.Second // max time to write a message to the socket
+	pongWait   = 60 * time.Second // max time to wait for a pong response
+	pingPeriod = 10 * time.Second // how often to send a ping
 )
 
 func HandleWS(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +73,7 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 		return
 	}
-	
+
 	var authMsg AuthMessage
 	if err := json.Unmarshal(msgBytes, &authMsg); err != nil || authMsg.Type != "auth" {
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "auth message required"))
@@ -102,10 +105,10 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 
 	// step 2 : register
 	client := &hub.Client{
-		UserID: claims.Sub,
+		UserID:      claims.Sub,
 		CommunityID: communityID,
-		Conn: conn,
-		Send: make(chan []byte, 64), // buffered - don't block writer on slow client
+		Conn:        conn,
+		Send:        make(chan []byte, 64), // buffered - don't block writer on slow client
 	}
 
 	hub.Global.Register(client)
@@ -138,7 +141,6 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 	pubsub.Close()
 
 	log.Printf("[WS] client disconnected: userID=%s, communityID=%s", client.UserID, client.CommunityID)
-
 
 }
 
@@ -223,12 +225,12 @@ func writer(client *hub.Client, pubsub *goredis.PubSub) {
 		case msg, ok := <-ch:
 			// Redis pub/sub delivered a message
 			if !ok {
-				return   // pubsub closed, stop writer
+				return // pubsub closed, stop writer
 			}
 
 			client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := client.Conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
-				return   // write failed — client likely disconnected
+				return // write failed — client likely disconnected
 			}
 
 		case data, ok := <-client.Send:
