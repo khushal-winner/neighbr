@@ -163,7 +163,7 @@ export default function RegisterPage() {
 
                 {showDemo && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowDemo(false)}>
-                        <div className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl bg-black" onClick={e => e.stopPropagation()}>
                             <button
                                 type="button"
                                 onClick={() => setShowDemo(false)}
@@ -171,13 +171,15 @@ export default function RegisterPage() {
                             >
                                 <X size={20} />
                             </button>
-                            <video
-                                controls
-                                autoPlay
-                                className="w-full h-auto max-h-[80vh] object-contain bg-black"
-                            >
-                                <source src="/export-1779746769464.mp4" type="video/mp4" />
-                            </video>
+                            <div className="aspect-video w-full">
+                                <iframe
+                                    src="https://www.youtube.com/embed/nt9BL56vwAU?si=oOaDwz0K7W1bg_lO&autoplay=1"
+                                    title="Neighbr Demo"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                    className="w-full h-full"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
