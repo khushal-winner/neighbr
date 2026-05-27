@@ -32,7 +32,11 @@ export default function RegisterPage() {
             await identityApi.post('/auth/register', form)
             router.push('/login?registered=1')
         } catch (err: any) {
-            setError(err.response?.data?.error ?? 'Registration failed')
+            if (!err.response) {
+                setError("refresh & try again server might be sleeping\u{1F634}")
+            } else {
+                setError(err.response?.data?.error ?? 'Registration failed')
+            }
         } finally {
             setLoading(false)
         }

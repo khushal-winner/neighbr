@@ -53,7 +53,11 @@ function LoginForm() {
                 router.push('/feed')
             }
         } catch (err: any) {
-            setError(err.response?.data?.error ?? 'Login failed')
+            if (!err.response) {
+                setError("refresh & try again server might be sleeping\u{1F634}")
+            } else {
+                setError(err.response?.data?.error ?? 'Login failed')
+            }
         } finally {
             setLoading(false)
         }
