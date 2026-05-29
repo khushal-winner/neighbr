@@ -55,6 +55,7 @@ function LoginForm() {
         } catch (err: any) {
             if (!err.response) {
                 setError("refresh & try again server might be sleeping\u{1F634}")
+                setTimeout(() => window.location.reload(), 4000)
             } else {
                 setError(err.response?.data?.error ?? 'Login failed')
             }
