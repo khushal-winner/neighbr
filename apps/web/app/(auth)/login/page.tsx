@@ -8,7 +8,7 @@ import { setAccessToken } from '@/lib/auth'
 import { useAuthStore } from '@/store/auth'
 import { AuthShell } from '@/components/AuthShell'
 import { AuthFormCard } from '@/components/auth/AuthFormCard'
-import { LogIn, Mail, Lock, CheckCircle2, Loader2, Info, Zap, Play, X } from 'lucide-react'
+import { LogIn, Mail, Lock, CheckCircle2, Loader2, Zap, Play, X } from 'lucide-react'
 
 function LoginForm() {
     const router = useRouter()
@@ -19,7 +19,6 @@ function LoginForm() {
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [showRegistered, setShowRegistered] = useState(false)
-    const [showQuickInfo, setShowQuickInfo] = useState(false)
     const [showDemo, setShowDemo] = useState(false)
 
     useEffect(() => {
@@ -28,9 +27,43 @@ function LoginForm() {
         }
     }, [searchParams])
 
-    function handleQuickLogin() {
+    async function handleGuestLogin() {
         setEmail('neighbrlogin999@gmail.com')
         setPassword('freelogin')
+        setError('')
+        setLoading(true)
+
+        for (let i = 0; i < 3; i++) {
+            if (i > 0) await new Promise(r => setTimeout(r, 1500))
+            try {
+                const res = await identityApi.post('/auth/login', {
+                    email: 'neighbrlogin999@gmail.com',
+                    password: 'freelogin'
+                })
+                const { accessToken, user } = res.data
+                setAccessToken(accessToken)
+                setAuth(user, accessToken)
+
+                if (user.verificationLevel === 'unverified') {
+                    router.push('/verify/address')
+                } else if (user.verificationLevel === 'address_verified') {
+                    router.push('/verify/postcard')
+                } else {
+                    router.push('/feed')
+                }
+                return
+            } catch (err: any) {
+                if (i === 2) {
+                    if (!err.response) {
+                        setError("refresh & try again server might be sleeping\u{1F634}")
+                        setTimeout(() => window.location.reload(), 4000)
+                    } else {
+                        setError(err.response?.data?.error ?? 'Login failed')
+                    }
+                }
+            }
+        }
+        setLoading(false)
     }
 
     async function handleSubmit(e: React.FormEvent) {
@@ -142,40 +175,21 @@ function LoginForm() {
                     )}
                 </button>
 
-                {/* Quick Login */}
-                <div className="quick-login-section" id="quick-login-section">
+                {/* Guest Login */}
+                <div className="quick-login-section">
                     <div className="quick-login-divider">
                         <span>or</span>
                     </div>
                     <div className="quick-login-row">
                         <button
                             type="button"
-                            onClick={handleQuickLogin}
+                            onClick={handleGuestLogin}
                             className="quick-login-btn"
-                            id="quick-login-btn"
+                            disabled={loading}
                         >
                             <Zap size={16} strokeWidth={2.5} />
-                            Quick Login
+                            Guest Login
                         </button>
-                        <div className="quick-login-info-wrap">
-                            <button
-                                type="button"
-                                className="quick-login-info-trigger"
-                                onClick={() => setShowQuickInfo(!showQuickInfo)}
-                                onMouseEnter={() => setShowQuickInfo(true)}
-                                onMouseLeave={() => setShowQuickInfo(false)}
-                                aria-label="What is Quick Login?"
-                                id="quick-login-info-btn"
-                            >
-                                <Info size={17} />
-                            </button>
-                            {showQuickInfo && (
-                                <div className="quick-login-tooltip" id="quick-login-tooltip">
-                                    <strong>Public demo account</strong>
-                                    <span>Skip address &amp; email verification and explore the app instantly. Credentials are shared for everyone to test.</span>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
 
