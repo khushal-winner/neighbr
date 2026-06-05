@@ -78,8 +78,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (rehydrating) {
     return (
       <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
-        <body className="min-h-screen flex items-center justify-center bg-gray-50">
-          <Loader2 className="animate-spin text-gray-300" size={32} />
+        <body className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-6">
+          <img src="/logo.svg" alt="NeighBr" className="w-14 h-14" />
+          <Loader2 className="animate-spin text-gray-300" size={28} />
         </body>
       </html>
     );
