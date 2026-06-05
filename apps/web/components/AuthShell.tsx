@@ -47,7 +47,7 @@ export function AuthShell({
                     <div className="lg:hidden px-6 pt-8 pb-2 text-center auth-mobile-brand">
                         <div className="inline-flex items-center gap-2">
                             <div className="auth-logo-mark auth-logo-mark-sm">
-                                <span className="text-lg">🏘️</span>
+                                <img src="/logo.svg" alt="NeighBr" className="w-7 h-7 rounded-lg" />
                             </div>
                             <span className="font-display font-bold text-xl text-gray-900 tracking-tight">
                                 NeighBr

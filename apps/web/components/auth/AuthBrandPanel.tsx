@@ -30,7 +30,7 @@ export function AuthBrandPanel({ variant }: { variant: AuthVariant }) {
 
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-10">
-                    <img src="/logo.svg" alt="NeighBr" className="w-9 h-9" />
+                    <img src="/logo-white.svg" alt="NeighBr" className="w-9 h-9" />
                     <span className="font-display font-bold text-2xl tracking-tight">NeighBr</span>
                 </div>
 

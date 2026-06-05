@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- House 1 (Left, slightly transparent) -->
+  <path d="M100 300L180 220L260 300V410H100V300Z" fill="white" opacity="0.45"/>
+
+  <!-- House 2 (Right) -->
+  <path d="M252 300L332 220L412 300V410H252V410V300Z" fill="white" opacity="0.7"/>
+
+  <!-- House 3 (Top / Connection — coral accent) -->
+  <path d="M176 240L256 160L336 240V360H176V240Z" fill="#FF7F50"/>
+
+  <!-- Window dot on coral house -->
+  <circle cx="256" cy="280" r="14" fill="white" opacity="0.9"/>
+
+  <!-- Ground connecting line -->
+  <path d="M100 410H412" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.35"/>
+</svg>
